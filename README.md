@@ -18,19 +18,24 @@ npm install @blakeembrey/react-route --save
 Use with [React Location](https://github.com/blakeembrey/react-location).
 
 ```js
-import { route } from "@blakeembrey/react-route";
+import { Route } from "@blakeembrey/react-route";
 
 const App = () => {
   return (
     <div>
-      {route("/blog", () => (
-        <ul />
-      ))}
-      {route("/blog/:id", ([id]) => (
-        <div>{id}</div>
-      ))}
+      <Route path="/page">{() => <ul />}</Route>
+      <Route path="/page/:id">{([id]) => <div>{id}</div>}</Route>
       {/* Supports nested routing with `path-to-regexp` options. */}
-      {route("/blog", () => route("/:id", () => <div />), { end: false })}
+      <Route path="/page" options={{ end: false }}>
+        {() => {
+          return (
+            <>
+              <Route path="/">{() => <ul />}</Route>
+              <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+            </>
+          );
+        }}
+      </Route>
     </div>
   );
 };

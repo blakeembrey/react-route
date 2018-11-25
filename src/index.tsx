@@ -1,12 +1,12 @@
 import pathToRegExp = require("path-to-regexp");
 import * as React from "react";
-import { Context, Route, SimpleLocation } from "@blakeembrey/react-location";
+import { Context, Router, SimpleLocation } from "@blakeembrey/react-location";
 
 /**
  * Simple nested router support.
  */
 export class NestedLocation extends SimpleLocation {
-  constructor(public parent: SimpleLocation, public prefix: string, url: URL) {
+  constructor(public parent: SimpleLocation, public match: string, url: URL) {
     super(url);
   }
 
@@ -16,34 +16,47 @@ export class NestedLocation extends SimpleLocation {
 }
 
 /**
- * Create a simple route function.
+ * Props for path matching.
  */
-export function route(
-  path: pathToRegExp.Path,
-  callback: (params: string[], url: URL) => React.ReactNode,
-  options?: pathToRegExp.RegExpOptions
-) {
+export interface RouteProps {
+  path: pathToRegExp.Path;
+  options?: pathToRegExp.RegExpOptions;
+  children: (
+    params: string[],
+    url: URL,
+    location: NestedLocation
+  ) => React.ReactNode;
+}
+
+/**
+ * Simple path matching component.
+ */
+export function Route({ path, options, children }: RouteProps) {
   const re = pathToRegExp(path, undefined, options);
 
   return (
-    <Route>
-      {({ origin, pathname, search, hash }, location) => {
-        const m = re.exec(pathname);
+    <Router>
+      {(url, location) => {
+        const m = re.exec(url.pathname);
 
         if (!m) return false;
 
-        const prefix = m[0];
-        const params = m.slice(1);
-        const nested =
-          pathname.slice(0, m.index) + pathname.slice(m.index + prefix.length);
-        const url = new URL(`${nested}${search}${hash}`, origin);
+        const match = m[0];
+        const nestedPathname =
+          url.pathname.slice(0, m.index) +
+          url.pathname.slice(m.index + match.length);
+        const nestedUrl = new URL(
+          `${nestedPathname || '/'}${url.search}${url.hash}`,
+          url.href
+        );
+        const nestedLocation = new NestedLocation(location, match, nestedUrl);
 
         return (
-          <Context.Provider value={new NestedLocation(location, prefix, url)}>
-            {callback(params, url)}
+          <Context.Provider value={nestedLocation}>
+            {children(m.slice(1), nestedUrl, nestedLocation)}
           </Context.Provider>
         );
       }}
-    </Route>
+    </Router>
   );
 }
