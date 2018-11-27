@@ -105,6 +105,22 @@ describe("react route", () => {
     document.body.removeChild(node);
   });
 
+  it("should compile paths from template", () => {
+    const node = document.createElement("div");
+
+    render(
+      <Route path="/">
+        {(params, url, location) => (
+          <div>{location.compile("/:id", { id: 123 })}</div>
+        )}
+      </Route>,
+      node
+    );
+
+    expect(node.children.length).toBe(1);
+    expect(node.children[0].textContent).toEqual("/123");
+  });
+
   describe("nested routing", () => {
     const App = () => {
       return (

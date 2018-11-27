@@ -1,17 +1,30 @@
-import pathToRegExp = require("path-to-regexp");
+import pathToRegexp = require("path-to-regexp");
 import * as React from "react";
-import { Context, Router, SimpleLocation } from "@blakeembrey/react-location";
+import { Context, SimpleLocation, Router } from "@blakeembrey/react-location";
+
+/**
+ * Path matching options.
+ */
+export type Options = pathToRegexp.RegExpOptions & pathToRegexp.ParseOptions;
 
 /**
  * Simple nested router support.
  */
-export class NestedLocation extends SimpleLocation {
-  constructor(public parent: SimpleLocation, public match: string, url: URL) {
+export class RouteLocation extends SimpleLocation {
+  constructor(
+    url: URL,
+    public parent: SimpleLocation,
+    public options: Options = {}
+  ) {
     super(url);
   }
 
   push(location: string) {
     return this.parent.push(location);
+  }
+
+  compile(path: string, params: object) {
+    return pathToRegexp.compile(path, this.options)(params);
   }
 }
 
@@ -19,12 +32,12 @@ export class NestedLocation extends SimpleLocation {
  * Props for path matching.
  */
 export interface RouteProps {
-  path: pathToRegExp.Path;
-  options?: pathToRegExp.RegExpOptions;
+  path: string;
+  options?: Options;
   children: (
     params: string[],
     url: URL,
-    location: NestedLocation
+    location: RouteLocation
   ) => React.ReactNode;
 }
 
@@ -32,7 +45,7 @@ export interface RouteProps {
  * Simple path matching component.
  */
 export function Route({ path, options, children }: RouteProps) {
-  const re = React.useMemo(() => pathToRegExp(path, undefined, options), [
+  const re = React.useMemo(() => pathToRegexp(path, undefined, options), [
     path,
     options
   ]);
@@ -42,17 +55,15 @@ export function Route({ path, options, children }: RouteProps) {
       {(url, location) => {
         const m = re.exec(url.pathname);
 
-        if (!m) return false;
+        if (!m) return null;
 
         const match = m[0];
-        const nestedPathname =
+        const newPathname =
           url.pathname.slice(0, m.index) +
           url.pathname.slice(m.index + match.length);
-        const nestedUrl = new URL(
-          `${nestedPathname || "/"}${url.search}${url.hash}`,
-          url.href
-        );
-        const nestedLocation = new NestedLocation(location, match, nestedUrl);
+        const newPath = `${newPathname || "/"}${url.search}${url.hash}`;
+        const newUrl = new URL(newPath, url.href);
+        const newLocation = new RouteLocation(newUrl, location, options);
         const params: string[] = Array(match.length - 1);
 
         // Decode URL parameters for route.
@@ -60,13 +71,13 @@ export function Route({ path, options, children }: RouteProps) {
           try {
             params[i - 1] = decodeURIComponent(m[i]);
           } catch (e) {
-            return false; // Bail from router on bad URL.
+            return null; // Bail from router on bad URL.
           }
         }
 
         return (
-          <Context.Provider value={nestedLocation}>
-            {children(params, nestedUrl, nestedLocation)}
+          <Context.Provider value={newLocation}>
+            {children(params, newUrl, newLocation)}
           </Context.Provider>
         );
       }}
