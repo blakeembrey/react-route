@@ -25,7 +25,7 @@ const App = () => {
     <div>
       <Route path="/page">{() => <ul />}</Route>
       <Route path="/page/:id">{([id]) => <div>{id}</div>}</Route>
-      {/* Supports nested routing with `path-to-regexp` options. */}
+      {/* Also supports nested routing with `path-to-regexp` options. */}
       <Route path="/page" options={{ end: false }}>
         {() => {
           return (

@@ -124,16 +124,20 @@ describe("react route", () => {
   describe("nested routing", () => {
     const App = () => {
       return (
-        <Route path="/page" options={{ end: false }}>
-          {() => {
-            return (
-              <>
-                <Route path="/">{() => <ul />}</Route>
-                <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
-              </>
-            );
-          }}
-        </Route>
+        <>
+          <Route path="/page" options={{ end: false }}>
+            {() => {
+              return (
+                <>
+                  <Route path="/">{() => <ul />}</Route>
+                  <Route path="/me">{() => <Link to="/foo">Blake</Link>}</Route>
+                  <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+                </>
+              );
+            }}
+          </Route>
+          <Route path="(.*)">{() => <div>Not Found</div>}</Route>
+        </>
       );
     };
 
@@ -169,6 +173,52 @@ describe("react route", () => {
       expect(node.children.length).toBe(1);
       expect(node.children[0].nodeName).toEqual("DIV");
       expect(node.children[0].textContent).toEqual("123");
+    });
+
+    it("should render static route before id", () => {
+      const location = new SimpleLocation(
+        new URL("http://example.com/page/me")
+      );
+      const node = document.createElement("div");
+
+      document.body.appendChild(node);
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("A");
+      expect(node.children[0].textContent).toEqual("Blake");
+
+      (node.children[0] as HTMLAnchorElement).click();
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("DIV");
+      expect(node.children[0].textContent).toEqual("Not Found");
+
+      document.body.removeChild(node);
+    });
+
+    it("should render not found route", () => {
+      const location = new SimpleLocation(
+        new URL("http://example.com/not/found")
+      );
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("DIV");
+      expect(node.children[0].textContent).toEqual("Not Found");
     });
   });
 });
