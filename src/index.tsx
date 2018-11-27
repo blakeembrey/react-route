@@ -19,6 +19,11 @@ export class RouteLocation extends SimpleLocation {
     super(url);
   }
 
+  get fullUrl(): URL {
+    if (this.parent instanceof RouteLocation) return this.parent.fullUrl;
+    return this.parent.url;
+  }
+
   push(location: string) {
     return this.parent.push(location);
   }
@@ -54,26 +59,18 @@ export function Route({ path, options, children }: RouteProps) {
     <Router>
       {(url, location) => {
         const m = re.exec(url.pathname);
-
         if (!m) return null;
 
-        const match = m[0];
+        const params = toParams(m);
+        if (!params) return null;
+
+        const value = m[0];
         const newPathname =
           url.pathname.slice(0, m.index) +
-          url.pathname.slice(m.index + match.length);
+          url.pathname.slice(m.index + value.length);
         const newPath = `${newPathname || "/"}${url.search}${url.hash}`;
         const newUrl = new URL(newPath, url.href);
         const newLocation = new RouteLocation(newUrl, location, options);
-        const params: string[] = Array(match.length - 1);
-
-        // Decode URL parameters for route.
-        for (let i = 1; i < match.length; i++) {
-          try {
-            params[i - 1] = decodeURIComponent(m[i]);
-          } catch (e) {
-            return null; // Bail from router on bad URL.
-          }
-        }
 
         return (
           <Context.Provider value={newLocation}>
@@ -83,4 +80,22 @@ export function Route({ path, options, children }: RouteProps) {
       }}
     </Router>
   );
+}
+
+/**
+ * Transform a regexp result into a list of params.
+ */
+function toParams(m: RegExpExecArray) {
+  const params: string[] = Array(m.length - 1);
+
+  // Decode URL parameters for route.
+  for (let i = 1; i < m.length; i++) {
+    try {
+      params[i - 1] = decodeURIComponent(m[i]);
+    } catch (e) {
+      return; // Bail from router on bad URL.
+    }
+  }
+
+  return params;
 }
