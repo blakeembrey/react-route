@@ -32,7 +32,10 @@ export interface RouteProps {
  * Simple path matching component.
  */
 export function Route({ path, options, children }: RouteProps) {
-  const re = pathToRegExp(path, undefined, options);
+  const re = React.useMemo(() => pathToRegExp(path, undefined, options), [
+    path,
+    options
+  ]);
 
   return (
     <Router>
@@ -46,14 +49,24 @@ export function Route({ path, options, children }: RouteProps) {
           url.pathname.slice(0, m.index) +
           url.pathname.slice(m.index + match.length);
         const nestedUrl = new URL(
-          `${nestedPathname || '/'}${url.search}${url.hash}`,
+          `${nestedPathname || "/"}${url.search}${url.hash}`,
           url.href
         );
         const nestedLocation = new NestedLocation(location, match, nestedUrl);
+        const params: string[] = Array(match.length - 1);
+
+        // Decode URL parameters for route.
+        for (let i = 1; i < match.length; i++) {
+          try {
+            params[i - 1] = decodeURIComponent(m[i]);
+          } catch (e) {
+            return false; // Bail from router on bad URL.
+          }
+        }
 
         return (
           <Context.Provider value={nestedLocation}>
-            {children(m.slice(1), nestedUrl, nestedLocation)}
+            {children(params, nestedUrl, nestedLocation)}
           </Context.Provider>
         );
       }}
