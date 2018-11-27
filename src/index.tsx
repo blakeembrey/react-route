@@ -34,35 +34,28 @@ export class RouteLocation extends SimpleLocation {
 }
 
 /**
- * Route render function.
- */
-export type RouteChildren = (
-  params: string[],
-  url: URL,
-  location: RouteLocation
-) => React.ReactNode;
-
-/**
  * Props for path matching.
  */
 export interface RouteProps {
-  path: string;
+  path: pathToRegexp.Path;
   options?: Options;
-  children: RouteChildren;
+  children: (
+    params: string[],
+    url: URL,
+    location: RouteLocation
+  ) => React.ReactNode;
 }
 
 /**
  * Simple path matching component.
  */
 export function Route({ path, options, children }: RouteProps) {
-  const location = React.useContext(Context);
-  const router = getRouter(location);
-  const match = router.use(path, options);
+  const { result, location } = useRouter(path, options);
 
-  if (!match) return null;
+  if (!result) return null;
 
   const { url } = location;
-  const { params, value, index } = match;
+  const { params, value, index } = result;
 
   const newPathname =
     url.pathname.slice(0, index) + url.pathname.slice(index + value.length);
@@ -77,84 +70,54 @@ export function Route({ path, options, children }: RouteProps) {
   );
 }
 
+/**
+ * Match value.
+ */
 type Match = { value: string; index: number; params: string[] } | false;
-type Route = [RegExp, (match: Match) => void];
 
 /**
  * Create a router shared between `<Route />` components.
  */
 class Router {
-  routes: Array<Route> = [];
-  matched?: Route;
+  routes: Array<(url: URL) => void> = [];
+  matched?: RegExp;
   unsubscribe?: () => void;
 
   constructor(public location: SimpleLocation) {}
 
-  match(re: RegExp) {
-    const { url } = this.location;
-    const m = re.exec(url.pathname);
-    if (!m) return false;
-
-    const params = toParams(m);
-    if (!params) return false;
-
-    const value = m[0];
-    const index = m.index;
-
-    return { value, params, index };
-  }
-
-  update() {
-    // No routes matched.
+  refresh() {
+    // Reset matched route.
     this.matched = undefined;
 
-    for (const route of this.routes) {
-      const [re, updateMatch] = route;
-      const match = this.matched ? false : this.match(re);
-
-      // Update every match which will re-render state change.
-      updateMatch(match);
-    }
+    // Refresh all tracked routes.
+    for (const update of this.routes) update(this.location.url);
   }
 
-  track(route: Route) {
-    this.routes.push(route);
+  match(re: RegExp, url: URL) {
+    if (this.matched) return false;
+    const result = match(re, url);
+    if (result) this.matched = re;
+    return result;
+  }
+
+  track(re: RegExp, update: (match: URL) => void) {
+    // Push current route to track on routes.
+    this.routes.push(update);
 
     // Start listening for changes on the first route added.
     if (this.routes.length === 1) {
-      this.unsubscribe = this.location.onChange(() => this.update());
+      this.unsubscribe = this.location.onChange(() => this.refresh());
     }
 
     return () => {
-      this.routes.splice(this.routes.indexOf(route), 1);
+      this.routes.splice(this.routes.indexOf(update), 1);
 
       // Navigate when the currently matching route is removed.
-      if (this.matched === route) this.update();
+      if (this.matched === re) this.refresh();
 
       // Remove route change subscription when no routes remain.
       if (this.routes.length === 0 && this.unsubscribe) this.unsubscribe();
     };
-  }
-
-  use(path: string, options?: Options): Match {
-    const re = React.useMemo(() => pathToRegexp(path, undefined, options), [
-      path,
-      options
-    ]);
-
-    const initialValue = this.matched ? false : this.match(re);
-    const [match, updateMatch] = React.useState<Match>(initialValue);
-
-    // Track route for matching later.
-    const route: Route = [re, updateMatch];
-
-    // Track the matching route globally.
-    if (match) this.matched = route;
-
-    // Track router changes.
-    React.useLayoutEffect(() => this.track(route), [re]);
-
-    return match;
   }
 }
 
@@ -169,6 +132,31 @@ const routers = new WeakMap<SimpleLocation, Router>();
 function getRouter(key: SimpleLocation) {
   if (!routers.has(key)) routers.set(key, new Router(key));
   return routers.get(key)!;
+}
+
+/**
+ * Use `router`. Encapsulates matching and updates to route.
+ */
+export function useRouter(path: pathToRegexp.Path, options?: Options) {
+  const location = React.useContext(Context);
+  const router = getRouter(location);
+
+  const re = React.useMemo(() => pathToRegexp(path, undefined, options), [
+    path,
+    options
+  ]);
+
+  // Use `state` to track route matches, avoids re-rendering on `false`.
+  const [result, update] = React.useReducer<Match, URL>(
+    (_, url) => router.match(re, url),
+    false,
+    location.url
+  );
+
+  // Track router changes.
+  React.useLayoutEffect(() => router.track(re, update));
+
+  return { location, result };
 }
 
 /**
@@ -187,4 +175,20 @@ function toParams(m: RegExpExecArray) {
   }
 
   return params;
+}
+
+/**
+ * Match a URL using a regexp.
+ */
+function match(re: RegExp, url: URL): Match {
+  const m = re.exec(url.pathname);
+  if (!m) return false;
+
+  const params = toParams(m);
+  if (!params) return false;
+
+  const value = m[0];
+  const index = m.index;
+
+  return { value, params, index };
 }
