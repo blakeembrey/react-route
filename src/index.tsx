@@ -44,7 +44,7 @@ export interface RouteProps {
   path: pathToRegexp.Path;
   options?: Options;
   children: (
-    params: string[],
+    params: Array<string | undefined>,
     url: URL,
     location: RouteLocation
   ) => React.ReactNode;
@@ -99,7 +99,9 @@ export function Match({ path, options, children }: MatchProps) {
 /**
  * Match result.
  */
-export type Match = { value: string; index: number; params: string[] } | false;
+export type Match =
+  | { value: string; index: number; params: Array<string | undefined> }
+  | false;
 
 /**
  * Create a router shared between `<Route />` components.
@@ -195,10 +197,12 @@ function usePath(path: pathToRegexp.Path, options?: Options) {
  * Transform a regexp result into a list of params.
  */
 function toParams(m: RegExpExecArray) {
-  const params: string[] = Array(m.length - 1);
+  const params: Array<string | undefined> = Array(m.length - 1);
 
   // Decode URL parameters for route.
   for (let i = 1; i < m.length; i++) {
+    if ((m[i] as string | undefined) === undefined) continue;
+
     try {
       params[i - 1] = decodeURIComponent(m[i]);
     } catch (e) {

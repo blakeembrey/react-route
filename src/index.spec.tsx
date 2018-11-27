@@ -48,6 +48,21 @@ describe("react route", () => {
     expect(node.children[0].textContent).toEqual("123");
   });
 
+  it("should support optional params", () => {
+    const location = new SimpleLocation(new URL("http://example.com/blog"));
+    const node = document.createElement("div");
+
+    render(
+      <Context.Provider value={location}>
+        <Route path="/blog/:id?">{([id]) => <div>{typeof id}</div>}</Route>
+      </Context.Provider>,
+      node
+    );
+
+    expect(node.children.length).toBe(1);
+    expect(node.children[0].textContent).toEqual("undefined");
+  });
+
   it("should prefix match route", () => {
     const location = new SimpleLocation(new URL("http://example.com/foo/bar"));
     const node = document.createElement("div");
