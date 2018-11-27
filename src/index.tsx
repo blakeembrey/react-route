@@ -1,6 +1,10 @@
 import pathToRegexp = require("path-to-regexp");
 import * as React from "react";
-import { Context, SimpleLocation } from "@blakeembrey/react-location";
+import {
+  Context,
+  SimpleLocation,
+  Router as LocationRouter
+} from "@blakeembrey/react-location";
 
 /**
  * Path matching options.
@@ -71,9 +75,31 @@ export function Route({ path, options, children }: RouteProps) {
 }
 
 /**
- * Match value.
+ * Unconditionally render a `<Match />` component.
  */
-type Match = { value: string; index: number; params: string[] } | false;
+export interface MatchProps {
+  path: pathToRegexp.Path;
+  options?: Options;
+  children: (match: Match, location: SimpleLocation) => React.ReactNode;
+}
+
+/**
+ * Create a `match` function.
+ */
+export function Match({ path, options, children }: MatchProps) {
+  const re = usePath(path, options);
+
+  return (
+    <LocationRouter>
+      {(url, location) => children(match(re, url), location)}
+    </LocationRouter>
+  );
+}
+
+/**
+ * Match result.
+ */
+export type Match = { value: string; index: number; params: string[] } | false;
 
 /**
  * Create a router shared between `<Route />` components.
@@ -139,12 +165,8 @@ function getRouter(key: SimpleLocation) {
  */
 export function useRouter(path: pathToRegexp.Path, options?: Options) {
   const location = React.useContext(Context);
+  const re = usePath(path, options);
   const router = getRouter(location);
-
-  const re = React.useMemo(() => pathToRegexp(path, undefined, options), [
-    path,
-    options
-  ]);
 
   // Use `state` to track route matches, avoids re-rendering on `false`.
   const [result, update] = React.useReducer<Match, URL>(
@@ -157,6 +179,16 @@ export function useRouter(path: pathToRegexp.Path, options?: Options) {
   React.useLayoutEffect(() => router.track(re, update));
 
   return { location, result };
+}
+
+/**
+ * Create a `path-to-regexp` result from path + options.
+ */
+function usePath(path: pathToRegexp.Path, options?: Options) {
+  return React.useMemo(() => pathToRegexp(path, undefined, options), [
+    path,
+    options
+  ]);
 }
 
 /**

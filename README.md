@@ -41,6 +41,8 @@ const App = () => {
 };
 ```
 
+**Tip:** Every `<Route />` shares a cache based on the `Location` context from `react-location`. Why? This enables only the first route to be matched against the URL. Any other route will be ignored, enabled "not found" routes.
+
 ## TypeScript
 
 This project uses [TypeScript](https://github.com/Microsoft/TypeScript) and publishes definitions on NPM.

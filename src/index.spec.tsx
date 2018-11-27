@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render } from "react-dom";
 import { Context, SimpleLocation, Link } from "@blakeembrey/react-location";
-import { Route } from "./index";
+import { Route, Match } from "./index";
 
 describe("react route", () => {
   it("should not match route", () => {
@@ -119,6 +119,36 @@ describe("react route", () => {
 
     expect(node.children.length).toBe(1);
     expect(node.children[0].textContent).toEqual("/123");
+  });
+
+  describe("match", () => {
+    const App = () => (
+      <Match path="/">{match => <div>{match ? "true" : "false"}</div>}</Match>
+    );
+
+    it("should render matches", () => {
+      const node = document.createElement("div");
+
+      render(<App />, node);
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("true");
+    });
+
+    it("should render non-matches", () => {
+      const location = new SimpleLocation(new URL("http://example.com/page"));
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("false");
+    });
   });
 
   describe("nested routing", () => {
