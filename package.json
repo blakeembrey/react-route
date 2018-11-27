@@ -17,7 +17,7 @@
     "example:simple": "webpack-dev-server --config examples/simple/webpack.js",
     "example:history": "webpack-dev-server --config examples/history/webpack.js",
     "example:hash": "webpack-dev-server --config examples/hash/webpack.js",
-    "prepublish": "npm run build"
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
