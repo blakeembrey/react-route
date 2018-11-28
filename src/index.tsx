@@ -178,7 +178,7 @@ export function useRouter(path: pathToRegexp.Path, options?: Options) {
   );
 
   // Track router changes.
-  React.useLayoutEffect(() => router.track(re, update));
+  React.useLayoutEffect(() => router.track(re, update), [re, update]);
 
   return { location, result };
 }
