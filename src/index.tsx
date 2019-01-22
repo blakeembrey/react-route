@@ -3,6 +3,7 @@ import * as React from "react";
 import {
   Context,
   SimpleLocation,
+  Redirect as LocationRedirect,
   Router as LocationRouter
 } from "@blakeembrey/react-location";
 
@@ -94,6 +95,23 @@ export function Match({ path, options, children }: MatchProps) {
       {(url, location) => children(match(re, url), location)}
     </LocationRouter>
   );
+}
+
+/**
+ * Redirection component properties.
+ */
+export interface RedirectProps {
+  path: string
+  params?: object
+  options?: pathToRegexp.ParseOptions
+}
+
+/**
+ * Declarative redirect with `path-to-regexp`.
+ */
+export function Redirect({ path, options, params }: RedirectProps) {
+  const fn = React.useMemo(() => pathToRegexp.compile(path, options), [path, options]);
+  return <LocationRedirect to={fn(params)} />
 }
 
 /**
