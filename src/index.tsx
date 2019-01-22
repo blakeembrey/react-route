@@ -18,7 +18,7 @@ export class RouteLocation extends SimpleLocation {
   constructor(
     url: URL,
     public parent: SimpleLocation,
-    public options: Options = {}
+    public options: pathToRegexp.ParseOptions = {}
   ) {
     super(url);
   }
@@ -128,7 +128,7 @@ class Router {
     return result;
   }
 
-  track(re: RegExp, update: (match: URL) => void) {
+  track(re: RegExp, update: (url: URL) => void) {
     // Push current route to track on routes.
     this.routes.push(update);
 
@@ -152,14 +152,15 @@ class Router {
 /**
  * Route render tracking.
  */
-const routers = new WeakMap<SimpleLocation, Router>();
+const LOCATION_SYMBOL = Symbol("ReactRoute");
 
 /**
  * Get the router for a location.
  */
-function getRouter(key: SimpleLocation) {
-  if (!routers.has(key)) routers.set(key, new Router(key));
-  return routers.get(key)!;
+function getRouter(location: SimpleLocation & { [LOCATION_SYMBOL]?: Router }) {
+  let router = location[LOCATION_SYMBOL];
+  if (!router) router = location[LOCATION_SYMBOL] = new Router(location);
+  return router;
 }
 
 /**
@@ -167,8 +168,8 @@ function getRouter(key: SimpleLocation) {
  */
 export function useRouter(path: pathToRegexp.Path, options?: Options) {
   const location = React.useContext(Context);
-  const re = usePath(path, options);
   const router = getRouter(location);
+  const re = usePath(path, options);
 
   // Use `state` to track route matches, avoids re-rendering on `false`.
   const [result, update] = React.useReducer<Match, URL>(
