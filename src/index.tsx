@@ -190,14 +190,12 @@ export function useRouter(path: pathToRegexp.Path, options?: Options) {
   const re = usePath(path, options);
 
   // Use `state` to track route matches, avoids re-rendering on `false`.
-  const [result, update] = React.useReducer<Match, URL>(
-    (_, url) => router.match(re, url),
-    false,
-    location.url
-  );
+  const initialState = router.match(re, location.url);
+  const [result, setResult] = React.useState<Match>(initialState);
+  const update = (url: URL) => setResult(router.match(re, url))
 
   // Track router changes.
-  React.useLayoutEffect(() => router.track(re, update), [re, update]);
+  React.useLayoutEffect(() => router.track(re, update), [re]);
 
   return { location, result };
 }
