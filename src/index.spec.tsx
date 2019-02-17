@@ -181,7 +181,9 @@ describe("react route", () => {
               );
             }}
           </Route>
-          <Route path="(.*)">{() => <div>Not Found</div>}</Route>
+          <Route path="" options={{ end: false }}>
+            {() => <div>Not Found</div>}
+          </Route>
         </>
       );
     };
