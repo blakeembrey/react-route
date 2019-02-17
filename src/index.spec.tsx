@@ -24,7 +24,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo">{(_, { pathname }) => <div>{pathname}</div>}</Route>
+        <Route path="/foo">{(_, { url }) => <div>{url.pathname}</div>}</Route>
       </Context.Provider>,
       node
     );
@@ -70,7 +70,7 @@ describe("react route", () => {
     render(
       <Context.Provider value={location}>
         <Route path="/foo" options={{ end: false }}>
-          {(_, { pathname }) => <div>{pathname}</div>}
+          {(_, { url }) => <div>{url.pathname}</div>}
         </Route>
       </Context.Provider>,
       node
@@ -87,7 +87,7 @@ describe("react route", () => {
     render(
       <Context.Provider value={location}>
         <Route path="/bar" options={{ start: false }}>
-          {(_, { pathname }) => <div>{pathname}</div>}
+          {(_, { url }) => <div>{url.pathname}</div>}
         </Route>
       </Context.Provider>,
       node
@@ -125,7 +125,7 @@ describe("react route", () => {
 
     render(
       <Route path="/">
-        {(params, url, location) => (
+        {(params, location) => (
           <div>{location.compile("/:id", { id: 123 })}</div>
         )}
       </Route>,

@@ -8,6 +8,11 @@ import {
 } from "@blakeembrey/react-location";
 
 /**
+ * Route render tracking.
+ */
+const LOCATION_SYMBOL = Symbol("ReactRoute");
+
+/**
  * Path matching options.
  */
 export type Options = pathToRegexp.RegExpOptions & pathToRegexp.ParseOptions;
@@ -37,89 +42,6 @@ export class RouteLocation extends SimpleLocation {
     return pathToRegexp.compile(path, this.options)(params);
   }
 }
-
-/**
- * Props for path matching.
- */
-export interface RouteProps {
-  path: pathToRegexp.Path;
-  options?: Options;
-  children: (
-    params: Array<string | undefined>,
-    url: URL,
-    location: RouteLocation
-  ) => React.ReactNode;
-}
-
-/**
- * Simple path matching component.
- */
-export function Route({ path, options, children }: RouteProps) {
-  const { result, location } = useRouter(path, options);
-
-  if (!result) return null;
-
-  const { url } = location;
-  const { params, value, index } = result;
-
-  const newPathname =
-    url.pathname.slice(0, index) + url.pathname.slice(index + value.length);
-  const newPath = `${newPathname || "/"}${url.search}${url.hash}`;
-  const newUrl = new URL(newPath, url.href);
-  const newLocation = new RouteLocation(newUrl, location, options);
-
-  return (
-    <Context.Provider value={newLocation}>
-      {children(params, newUrl, newLocation)}
-    </Context.Provider>
-  );
-}
-
-/**
- * Unconditionally render a `<Match />` component.
- */
-export interface MatchProps {
-  path: pathToRegexp.Path;
-  options?: Options;
-  children: (match: Match, location: SimpleLocation) => React.ReactNode;
-}
-
-/**
- * Create a `match` function.
- */
-export function Match({ path, options, children }: MatchProps) {
-  const re = usePath(path, options);
-
-  return (
-    <LocationRouter>
-      {(url, location) => children(match(re, url), location)}
-    </LocationRouter>
-  );
-}
-
-/**
- * Redirection component properties.
- */
-export interface RedirectProps {
-  path: string
-  params?: object
-  options?: pathToRegexp.ParseOptions
-}
-
-/**
- * Declarative redirect with `path-to-regexp`.
- */
-export function Redirect({ path, options, params }: RedirectProps) {
-  const fn = React.useMemo(() => pathToRegexp.compile(path, options), [path, options]);
-  return <LocationRedirect to={fn(params)} />
-}
-
-/**
- * Match result.
- */
-export type Match =
-  | { value: string; index: number; params: Array<string | undefined> }
-  | false;
 
 /**
  * Create a router shared between `<Route />` components.
@@ -168,36 +90,12 @@ class Router {
 }
 
 /**
- * Route render tracking.
- */
-const LOCATION_SYMBOL = Symbol("ReactRoute");
-
-/**
  * Get the router for a location.
  */
 function getRouter(location: SimpleLocation & { [LOCATION_SYMBOL]?: Router }) {
   let router = location[LOCATION_SYMBOL];
   if (!router) router = location[LOCATION_SYMBOL] = new Router(location);
   return router;
-}
-
-/**
- * Use `router`. Encapsulates matching and updates to route.
- */
-export function useRouter(path: pathToRegexp.Path, options?: Options) {
-  const location = React.useContext(Context);
-  const router = getRouter(location);
-  const re = usePath(path, options);
-
-  // Use `state` to track route matches, avoids re-rendering on `false`.
-  const initialState = router.match(re, location.url);
-  const [result, setResult] = React.useState<Match>(initialState);
-  const update = (url: URL) => setResult(router.match(re, url))
-
-  // Track router changes.
-  React.useLayoutEffect(() => router.track(re, update), [re]);
-
-  return { location, result };
 }
 
 /**
@@ -209,6 +107,118 @@ function usePath(path: pathToRegexp.Path, options?: Options) {
     options
   ]);
 }
+
+/**
+ * Create a `RouteLocation` based on parent location and options.
+ */
+function useRoute(parent: SimpleLocation, options?: pathToRegexp.ParseOptions) {
+  return React.useMemo(() => new RouteLocation(parent.url, parent, options), [
+    location,
+    options
+  ]);
+}
+
+/**
+ * Compute nested URL for route.
+ */
+function nestedUrl(url: URL, index: number, { length }: string) {
+  const { pathname, search, hash, href } = url;
+  if (length === 0) return url; // No URL change.
+  const newPathname = pathname.slice(0, index) + pathname.slice(index + length);
+  const newPath = `${newPathname || "/"}${search}${hash}`;
+  return new URL(newPath, href);
+}
+
+/**
+ * Props for path matching.
+ */
+export interface RouteProps {
+  path: pathToRegexp.Path;
+  options?: Options;
+  children: (
+    params: Array<string | undefined>,
+    location: RouteLocation
+  ) => React.ReactNode;
+}
+
+/**
+ * Simple path matching component.
+ */
+export function Route({ path, options, children }: RouteProps) {
+  const location = React.useContext(Context);
+  const route = useRoute(location, options);
+  const re = usePath(path, options);
+  const router = getRouter(location);
+
+  // Use `state` to track route matches, avoids re-rendering on `false`.
+  const [result, setResult] = React.useState<Result>(() =>
+    router.match(re, location.url)
+  );
+  const update = (url: URL) => setResult(router.match(re, url));
+
+  // Track router changes.
+  React.useLayoutEffect(() => router.track(re, update), [router, re]);
+
+  if (!result) return null;
+
+  const { params, index, value } = result;
+
+  // Update route URL with match.
+  route.url = nestedUrl(location.url, index, value);
+
+  return (
+    <Context.Provider value={route}>{children(params, route)}</Context.Provider>
+  );
+}
+
+/**
+ * Unconditionally render a `<Match />` component.
+ */
+export interface MatchProps {
+  path: pathToRegexp.Path;
+  options?: Options;
+  children: (match: Result, location: SimpleLocation) => React.ReactNode;
+}
+
+/**
+ * Create a `match` function.
+ */
+export function Match({ path, options, children }: MatchProps) {
+  const re = usePath(path, options);
+
+  return (
+    <LocationRouter>
+      {(url, location) => children(match(re, url), location)}
+    </LocationRouter>
+  );
+}
+
+/**
+ * Redirection component properties.
+ */
+export interface RedirectProps {
+  path: string;
+  params?: object;
+  options?: pathToRegexp.ParseOptions;
+}
+
+/**
+ * Declarative redirect with `path-to-regexp`.
+ */
+export function Redirect({ path, options, params }: RedirectProps) {
+  const fn = React.useMemo(() => pathToRegexp.compile(path, options), [
+    path,
+    options
+  ]);
+  return <LocationRedirect to={fn(params)} />;
+}
+
+/**
+ * Match result.
+ */
+export type Result =
+  | { value: string; index: number; params: Array<string | undefined> }
+  | false;
 
 /**
  * Transform a regexp result into a list of params.
@@ -233,7 +243,7 @@ function toParams(m: RegExpExecArray) {
 /**
  * Match a URL using a regexp.
  */
-function match(re: RegExp, url: URL): Match {
+function match(re: RegExp, url: URL): Result {
   const m = re.exec(url.pathname);
   if (!m) return false;
 
