@@ -41,6 +41,10 @@ export class RouteLocation extends SimpleLocation {
   compile(path: string, params: object) {
     return pathToRegexp.compile(path, this.options)(params);
   }
+
+  format(location: string) {
+    return this.parent.format(location);
+  }
 }
 
 /**
