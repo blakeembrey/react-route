@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render } from "react-dom";
 import { Context, SimpleLocation, Link } from "@blakeembrey/react-location";
-import { Route, Match } from "./index";
+import { Route, Match, Switch, usePath, UseRoute } from "./index";
 
 describe("react route", () => {
   it("should not match route", () => {
@@ -120,17 +120,16 @@ describe("react route", () => {
     document.body.removeChild(node);
   });
 
-  it("should compile paths from template", () => {
+  it("should compile paths", () => {
     const node = document.createElement("div");
 
-    render(
-      <Route path="/">
-        {(params, location) => (
-          <div>{location.compile("/:id", { id: 123 })}</div>
-        )}
-      </Route>,
-      node
-    );
+    const App = () => {
+      const path = usePath("/:id", { id: 123 });
+
+      return <div>{path}</div>;
+    };
+
+    render(<App />, node);
 
     expect(node.children.length).toBe(1);
     expect(node.children[0].textContent).toEqual("/123");
@@ -166,25 +165,83 @@ describe("react route", () => {
     });
   });
 
+  describe("switch", () => {
+    const App = () => {
+      return (
+        <Switch>
+          <Route path="/me">{() => <span>Blake</span>}</Route>
+          <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+        </Switch>
+      );
+    };
+
+    it("should render match", () => {
+      const location = new SimpleLocation(new URL("http://example.com/123"));
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("DIV");
+      expect(node.children[0].textContent).toEqual("123");
+    });
+
+    it("should match first match only", () => {
+      const location = new SimpleLocation(new URL("http://example.com/me"));
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("SPAN");
+      expect(node.children[0].textContent).toEqual("Blake");
+    });
+
+    it("should render nothing when no match", () => {
+      const location = new SimpleLocation(new URL("http://example.com/x/y/z"));
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(0);
+    });
+  });
+
   describe("nested routing", () => {
     const App = () => {
       return (
-        <>
+        <Switch>
           <Route path="/page" options={{ end: false }}>
             {() => {
               return (
-                <>
+                <Switch>
                   <Route path="/">{() => <ul />}</Route>
                   <Route path="/me">{() => <Link to="/foo">Blake</Link>}</Route>
                   <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
-                </>
+                  <UseRoute>{(_, l) => <b>{l.fullUrl.pathname}</b>}</UseRoute>
+                </Switch>
               );
             }}
           </Route>
           <Route path="" options={{ end: false }}>
             {() => <div>Not Found</div>}
           </Route>
-        </>
+        </Switch>
       );
     };
 
@@ -266,6 +323,24 @@ describe("react route", () => {
       expect(node.children.length).toBe(1);
       expect(node.children[0].nodeName).toEqual("DIV");
       expect(node.children[0].textContent).toEqual("Not Found");
+    });
+
+    it("should render full url", () => {
+      const location = new SimpleLocation(
+        new URL("http://example.com/page/not/found")
+      );
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("B");
+      expect(node.children[0].textContent).toEqual("/page/not/found");
     });
   });
 });

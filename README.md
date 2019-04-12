@@ -18,30 +18,87 @@ npm install @blakeembrey/react-route --save
 Use with [React Location](https://github.com/blakeembrey/react-location).
 
 ```js
-import { Route } from "@blakeembrey/react-route";
-
-const App = () => {
-  return (
-    <div>
-      <Route path="/page">{() => <ul />}</Route>
-      <Route path="/page/:id">{([id]) => <div>{id}</div>}</Route>
-      {/* Also supports nested routing with `path-to-regexp` options. */}
-      <Route path="/page" options={{ end: false }}>
-        {() => {
-          return (
-            <>
-              <Route path="/">{() => <ul />}</Route>
-              <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
-            </>
-          );
-        }}
-      </Route>
-    </div>
-  );
-};
+import {
+  Match,
+  Route,
+  UseRoute,
+  Switch,
+  usePath
+} from "@blakeembrey/react-route";
 ```
 
-**Tip:** Every `<Route />` shares a cache based on the `Location` context from `react-location`. Why? This enables only the first route to be matched against the URL. Any other route will be ignored, enabled "not found" routes.
+### `Match`
+
+Unconditionally renders `children` with the match result of the active URL.
+
+```js
+const App = () => {
+  return (
+    <Match path="/test">
+      {(result, location) => <div>{JSON.stringify(result)}</div>}
+    </Match>
+  );
+}; // `/test` => `<div>{"params":[],"index":0,"value":"/test"}</div>`
+```
+
+### `Route`
+
+Conditionally renders `children` when the path matches the active URL.
+
+```js
+const App = () => {
+  return (
+    <Route path="/page/:id">
+      {(params, location) => <div>{JSON.stringify(params)}</div>}
+    </Route>
+  );
+}; // `/123` => `<div>["123"]</div>`
+```
+
+### `UseRoute`
+
+Pre-populated `<Route />` with `end=false` for prefix matching (if you don't define the `path`, it'll match everything). A la Express.js routers.
+
+```js
+const App = () => {
+  return (
+    <UseRoute path="/page">
+      {(_, location) => (
+        <div>
+          {JSON.stringify(location.url)} {JSON.stringify(location.fullUrl)}
+        </div>
+      )}
+    </UseRoute>
+  );
+}; // `/page/test` => `<div>"/test" "/page/test"</div>`
+```
+
+### `Switch`
+
+Component for matching and rendering the first `<Route />` of children.
+
+```js
+const App = () => {
+  return (
+    <Switch>
+      <Route path="/me">{() => <span>Blake</span>}</Route>
+      <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+    </Switch>
+  );
+}; // `/me` => `<span>Blake</span>`
+```
+
+### `usePath`
+
+Create a path from a `path-to-regexp` path and params.
+
+```js
+const App = () => {
+  const path = usePath("/:id", { id: 123 });
+
+  return <Link to={path}>User {id}</Link>;
+};
+```
 
 ## TypeScript
 

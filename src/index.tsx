@@ -1,16 +1,6 @@
 import pathToRegexp = require("path-to-regexp");
 import * as React from "react";
-import {
-  Context,
-  SimpleLocation,
-  Redirect as LocationRedirect,
-  Router as LocationRouter
-} from "@blakeembrey/react-location";
-
-/**
- * Route render tracking.
- */
-const LOCATION_SYMBOL = Symbol("ReactRoute");
+import { Context, SimpleLocation, Router } from "@blakeembrey/react-location";
 
 /**
  * Path matching options.
@@ -21,11 +11,7 @@ export type Options = pathToRegexp.RegExpOptions & pathToRegexp.ParseOptions;
  * Simple nested router support.
  */
 export class RouteLocation extends SimpleLocation {
-  constructor(
-    url: URL,
-    public parent: SimpleLocation,
-    public options: pathToRegexp.ParseOptions = {}
-  ) {
+  constructor(url: URL, public parent: SimpleLocation) {
     super(url);
   }
 
@@ -38,74 +24,30 @@ export class RouteLocation extends SimpleLocation {
     return this.parent.push(location);
   }
 
-  compile(path: string, params: object) {
-    return pathToRegexp.compile(path, this.options)(params);
-  }
-
   format(location: string) {
     return this.parent.format(location);
   }
 }
 
 /**
- * Create a router shared between `<Route />` components.
+ * Create a path from a `path-to-regexp` path and params.
  */
-class Router {
-  routes: Array<(url: URL) => void> = [];
-  matched?: RegExp;
-  unsubscribe?: () => void;
-
-  constructor(public location: SimpleLocation) {}
-
-  refresh() {
-    // Reset matched route.
-    this.matched = undefined;
-
-    // Refresh all tracked routes.
-    for (const update of this.routes) update(this.location.url);
-  }
-
-  match(re: RegExp, url: URL) {
-    if (this.matched) return false;
-    const result = match(re, url);
-    if (result) this.matched = re;
-    return result;
-  }
-
-  track(re: RegExp, update: (url: URL) => void) {
-    // Push current route to track on routes.
-    this.routes.push(update);
-
-    // Start listening for changes on the first route added.
-    if (this.routes.length === 1) {
-      this.unsubscribe = this.location.onChange(() => this.refresh());
-    }
-
-    return () => {
-      this.routes.splice(this.routes.indexOf(update), 1);
-
-      // Navigate when the currently matching route is removed.
-      if (this.matched === re) this.refresh();
-
-      // Remove route change subscription when no routes remain.
-      if (this.routes.length === 0 && this.unsubscribe) this.unsubscribe();
-    };
-  }
-}
-
-/**
- * Get the router for a location.
- */
-function getRouter(location: SimpleLocation & { [LOCATION_SYMBOL]?: Router }) {
-  let router = location[LOCATION_SYMBOL];
-  if (!router) router = location[LOCATION_SYMBOL] = new Router(location);
-  return router;
+export function usePath(
+  path: string,
+  params?: object,
+  options?: pathToRegexp.ParseOptions
+) {
+  const fn = React.useMemo(() => pathToRegexp.compile(path, options), [
+    path,
+    options
+  ]);
+  return React.useMemo(() => fn(params), [params]);
 }
 
 /**
  * Create a `path-to-regexp` result from path + options.
  */
-function usePath(path: pathToRegexp.Path, options?: Options) {
+export function usePathToRegexp(path: pathToRegexp.Path, options?: Options) {
   return React.useMemo(() => pathToRegexp(path, undefined, options), [
     path,
     options
@@ -113,13 +55,138 @@ function usePath(path: pathToRegexp.Path, options?: Options) {
 }
 
 /**
- * Create a `RouteLocation` based on parent location and options.
+ * Match props accept path, options and a child function to render.
  */
-function useRoute(parent: SimpleLocation, options?: pathToRegexp.ParseOptions) {
-  return React.useMemo(() => new RouteLocation(parent.url, parent, options), [
-    location,
+export interface MatchProps {
+  path: pathToRegexp.Path;
+  options?: Options;
+  children: (match: Result, location: SimpleLocation) => React.ReactNode;
+}
+
+/**
+ * Unconditionally renders `children` with the match result of the active URL.
+ */
+export function Match({ path, options, children }: MatchProps) {
+  const re = usePathToRegexp(path, options);
+
+  return (
+    <Router>{(url, location) => children(match(re, url), location)}</Router>
+  );
+}
+
+/**
+ * Matching route function.
+ */
+export type RouteFunction = (
+  params: Array<string | undefined>,
+  location: RouteLocation
+) => React.ReactNode;
+
+/**
+ * Route props accept a path, options and a function to render on match.
+ */
+export interface RouteProps {
+  path: pathToRegexp.Path;
+  options?: Options;
+  children: RouteFunction;
+}
+
+/**
+ * Conditionally renders `children` when the path matches the active URL.
+ */
+export function Route({ path, options, children }: RouteProps) {
+  return (
+    <Match path={path} options={options}>
+      {(result, location) => {
+        return result ? renderRoute(children, result, location) : null;
+      }}
+    </Match>
+  );
+}
+
+/**
+ * Use route props accept an optional path, options and function to render.
+ */
+export interface UseRouteProps {
+  path?: string;
+  options?: Options;
+  children: RouteFunction;
+}
+
+/**
+ * Pre-populated `<Route />` with `end=false` for prefix matching (if you don't
+ * define the `path`, it'll match everything). A la Express.js routers.
+ */
+export function UseRoute({ path, options, children }: UseRouteProps) {
+  const routeOptions = React.useMemo(() => ({ end: false, ...options }), [
     options
   ]);
+
+  return <Route path={path || ""} options={routeOptions} children={children} />;
+}
+
+/**
+ * Render the body of a `<Route />` component.
+ */
+function renderRoute(
+  fn: RouteFunction,
+  result: Exclude<Result, false>,
+  location: SimpleLocation
+) {
+  const { params, index, value } = result;
+  const url = nestedUrl(location.url, index, value);
+  const route = new RouteLocation(url, location);
+
+  return <Context.Provider value={route}>{fn(params, route)}</Context.Provider>;
+}
+
+/**
+ * Switch is a wrapper component for a list of `<Route />`.
+ */
+export interface SwitchProps {
+  children: Array<React.ReactElement<RouteProps, typeof Route>>;
+}
+
+/**
+ * Component for matching and rendering the first `<Route />` of children.
+ */
+export function Switch({ children }: SwitchProps) {
+  const childRoutes = React.useMemo(
+    () =>
+      React.Children.map(children, child => {
+        const { path, options, children: fn } = child.props;
+
+        if (child.type === Route) {
+          const re = pathToRegexp(path, undefined, options);
+          return { fn, re };
+        }
+
+        if (child.type === UseRoute) {
+          const re = pathToRegexp(path || "", undefined, {
+            end: false,
+            ...options
+          });
+
+          return { fn, re };
+        }
+
+        throw new TypeError("Expected `<Switch />` children to be `<Route />`");
+      }),
+    [children]
+  );
+
+  return (
+    <Router>
+      {(url, location) => {
+        for (const { fn, re } of childRoutes) {
+          const result = match(re, url);
+          if (result) return renderRoute(fn, result, location);
+        }
+
+        return null;
+      }}
+    </Router>
+  );
 }
 
 /**
@@ -131,90 +198,6 @@ function nestedUrl(url: URL, index: number, { length }: string) {
   const newPathname = pathname.slice(0, index) + pathname.slice(index + length);
   const newPath = `${newPathname || "/"}${search}${hash}`;
   return new URL(newPath, href);
-}
-
-/**
- * Props for path matching.
- */
-export interface RouteProps {
-  path: pathToRegexp.Path;
-  options?: Options;
-  children: (
-    params: Array<string | undefined>,
-    location: RouteLocation
-  ) => React.ReactNode;
-}
-
-/**
- * Simple path matching component.
- */
-export function Route({ path, options, children }: RouteProps) {
-  const location = React.useContext(Context);
-  const route = useRoute(location, options);
-  const re = usePath(path, options);
-  const router = getRouter(location);
-
-  // Use `state` to track route matches, avoids re-rendering on `false`.
-  const [result, setResult] = React.useState<Result>(() =>
-    router.match(re, location.url)
-  );
-  const update = (url: URL) => setResult(router.match(re, url));
-
-  // Track router changes.
-  React.useLayoutEffect(() => router.track(re, update), [router, re]);
-
-  if (!result) return null;
-
-  const { params, index, value } = result;
-
-  // Update route URL with match.
-  route.url = nestedUrl(location.url, index, value);
-
-  return (
-    <Context.Provider value={route}>{children(params, route)}</Context.Provider>
-  );
-}
-
-/**
- * Unconditionally render a `<Match />` component.
- */
-export interface MatchProps {
-  path: pathToRegexp.Path;
-  options?: Options;
-  children: (match: Result, location: SimpleLocation) => React.ReactNode;
-}
-
-/**
- * Create a `match` function.
- */
-export function Match({ path, options, children }: MatchProps) {
-  const re = usePath(path, options);
-
-  return (
-    <LocationRouter>
-      {(url, location) => children(match(re, url), location)}
-    </LocationRouter>
-  );
-}
-
-/**
- * Redirection component properties.
- */
-export interface RedirectProps {
-  path: string;
-  params?: object;
-  options?: pathToRegexp.ParseOptions;
-}
-
-/**
- * Declarative redirect with `path-to-regexp`.
- */
-export function Redirect({ path, options, params }: RedirectProps) {
-  const fn = React.useMemo(() => pathToRegexp.compile(path, options), [
-    path,
-    options
-  ]);
-  return <LocationRedirect to={fn(params)} />;
 }
 
 /**
