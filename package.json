@@ -1,6 +1,6 @@
 {
   "name": "@blakeembrey/react-route",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Path-to-RegExp with React Location",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
