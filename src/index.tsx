@@ -52,7 +52,7 @@ export function usePath(
   options?: pathToRegexp.ParseOptions
 ) {
   const fn = useCompiled(path, options);
-  return React.useMemo(() => fn(params), [params]);
+  return React.useMemo(() => fn(params), [fn, params]);
 }
 
 /**
@@ -193,12 +193,17 @@ export function Switch({ children }: SwitchProps) {
     [children]
   );
 
-  for (const { fn, re } of childRoutes) {
-    const result = match(re, url);
-    if (result) return renderRoute(fn, result, location);
-  }
+  return React.useMemo(
+    () => {
+      for (const { fn, re } of childRoutes) {
+        const result = match(re, url);
+        if (result) return renderRoute(fn, result, location);
+      }
 
-  return null;
+      return null;
+    },
+    [url, location, childRoutes]
+  );
 }
 
 /**
