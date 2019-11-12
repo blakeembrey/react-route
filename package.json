@@ -3,17 +3,21 @@
   "version": "3.0.1",
   "description": "Path-to-RegExp with React Location",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "module": "dist.es2015/index.js",
+  "sideEffects": false,
   "files": [
-    "dist/"
+    "dist/",
+    "dist.es2015/"
   ],
   "scripts": {
     "prettier": "prettier --write",
     "lint": "tslint \"src/**/*\" --project tsconfig.json",
-    "format": "npm run prettier -- \"src/**/*\"",
-    "build": "rimraf dist && tsc",
+    "format": "npm run prettier -- \"{.,src/**}/*.{js,jsx,ts,tsx,json,md,yml,yaml}\"",
+    "build": "rimraf dist/ dist.es2015/ && tsc && tsc -P tsconfig.es2015.json",
     "specs": "jest --coverage",
-    "test": "npm run -s lint && npm run -s build && npm run -s specs",
+    "test": "npm run -s lint && npm run -s build && npm run -s specs && npm run -s size",
+    "size": "size-limit",
     "example:simple": "webpack-dev-server --config examples/simple/webpack.js",
     "example:history": "webpack-dev-server --config examples/history/webpack.js",
     "example:hash": "webpack-dev-server --config examples/hash/webpack.js",
@@ -41,6 +45,12 @@
     "url": "https://github.com/blakeembrey/react-route/issues"
   },
   "homepage": "https://github.com/blakeembrey/react-route",
+  "size-limit": [
+    {
+      "path": "dist/index.js",
+      "limit": "2.3 kB"
+    }
+  ],
   "jest": {
     "roots": [
       "<rootDir>/src/"
@@ -64,7 +74,7 @@
     }
   },
   "lint-staged": {
-    "*.{js,json,css,md}": [
+    "*.{js,jsx,ts,tsx,json,md,yml,yaml}": [
       "npm run prettier",
       "git add"
     ]
@@ -74,6 +84,7 @@
   },
   "devDependencies": {
     "@blakeembrey/react-location": "^1.4.0",
+    "@size-limit/preset-small-lib": "^2.2.0",
     "@types/jest": "^24.0.0",
     "@types/node": "^12.6.8",
     "@types/react": "^16.8.2",
