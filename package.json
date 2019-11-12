@@ -85,11 +85,11 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.1",
     "react-location": "^2.0.5",
-    "rimraf": "^2.5.4",
+    "rimraf": "^3.0.0",
     "ts-jest": "^24.0.2",
     "tslint": "^5.0.0",
     "tslint-config-prettier": "^1.15.0",
-    "tslint-config-standard": "^8.0.0",
+    "tslint-config-standard": "^9.0.0",
     "typescript": "^3.3.3"
   },
   "peerDependencies": {
