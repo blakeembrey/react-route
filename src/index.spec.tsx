@@ -1,7 +1,7 @@
 import * as React from "react";
 import { render } from "react-dom";
 import { Context, SimpleLocation, Link } from "@blakeembrey/react-location";
-import { Route, Match, Switch, usePath, UseRoute } from "./index";
+import { Route, Switch, usePath, useMatch } from "./index";
 
 describe("react route", () => {
   it("should not match route", () => {
@@ -39,7 +39,9 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/blog/:id">{([id]) => <div>{id}</div>}</Route>
+        <Route<{ id: string }> path="/blog/:id">
+          {({ id }) => <div>{id}</div>}
+        </Route>
       </Context.Provider>,
       node
     );
@@ -54,7 +56,9 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/blog/:id?">{([id]) => <div>{typeof id}</div>}</Route>
+        <Route<{ id?: string }> path="/blog/:id?">
+          {({ id }) => <div>{typeof id}</div>}
+        </Route>
       </Context.Provider>,
       node
     );
@@ -69,7 +73,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo" options={{ end: false }}>
+        <Route path="/foo" end={false}>
           {(_, { url }) => <div>{url.pathname}</div>}
         </Route>
       </Context.Provider>,
@@ -86,7 +90,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/bar" options={{ start: false }}>
+        <Route path="/bar" start={false}>
           {(_, { url }) => <div>{url.pathname}</div>}
         </Route>
       </Context.Provider>,
@@ -95,6 +99,25 @@ describe("react route", () => {
 
     expect(node.children.length).toBe(1);
     expect(node.children[0].textContent).toEqual("/foo");
+  });
+
+  it("should match unicode route", () => {
+    const location = new SimpleLocation(
+      new URL("http://example.com/caf%C3%A9/test")
+    );
+    const node = document.createElement("div");
+
+    render(
+      <Context.Provider value={location}>
+        <Route path="/café" end={false}>
+          {(_, { url }) => <div>{url.pathname}</div>}
+        </Route>
+      </Context.Provider>,
+      node
+    );
+
+    expect(node.children.length).toBe(1);
+    expect(node.children[0].textContent).toEqual("/test");
   });
 
   it("should support links", () => {
@@ -124,7 +147,7 @@ describe("react route", () => {
     const node = document.createElement("div");
 
     const App = () => {
-      const path = usePath("/:id", { id: 123 });
+      const path = usePath<{ id: string }>("/:id", { id: "123" });
 
       return <div>{path}</div>;
     };
@@ -135,10 +158,27 @@ describe("react route", () => {
     expect(node.children[0].textContent).toEqual("/123");
   });
 
+  it("should encode path parameters", () => {
+    const node = document.createElement("div");
+
+    const App = () => {
+      const path = usePath<{ id: string }>("/:id", { id: "café" });
+
+      return <div>{path}</div>;
+    };
+
+    render(<App />, node);
+
+    expect(node.children.length).toBe(1);
+    expect(node.children[0].textContent).toEqual("/caf%C3%A9");
+  });
+
   describe("match", () => {
-    const App = () => (
-      <Match path="/">{match => <div>{match ? "true" : "false"}</div>}</Match>
-    );
+    const App = () => {
+      const match = useMatch("/");
+
+      return <div>{match ? "true" : "false"}</div>;
+    };
 
     it("should render matches", () => {
       const node = document.createElement("div");
@@ -170,7 +210,9 @@ describe("react route", () => {
       return (
         <Switch>
           <Route path="/me">{() => <span>Blake</span>}</Route>
-          <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+          <Route<{ id: string }> path="/:id">
+            {({ id }) => <div>{id}</div>}
+          </Route>
         </Switch>
       );
     };
@@ -220,25 +262,47 @@ describe("react route", () => {
 
       expect(node.children.length).toBe(0);
     });
+
+    it("should decode parameters", () => {
+      const location = new SimpleLocation(
+        new URL("http://example.com/caf%C3%A9")
+      );
+      const node = document.createElement("div");
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("DIV");
+      expect(node.children[0].textContent).toEqual("café");
+    });
   });
 
   describe("nested routing", () => {
     const App = () => {
       return (
         <Switch>
-          <Route path="/page" options={{ end: false }}>
+          <Route path="/page" end={false}>
             {() => {
               return (
                 <Switch>
                   <Route path="/">{() => <ul />}</Route>
                   <Route path="/me">{() => <Link to="/foo">Blake</Link>}</Route>
-                  <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
-                  <UseRoute>{(_, l) => <b>{l.fullUrl.pathname}</b>}</UseRoute>
+                  <Route<{ id: string }> path="/:id">
+                    {({ id }) => <div>{id}</div>}
+                  </Route>
+                  <Route end={false}>
+                    {(_, { fullUrl }) => <b>{fullUrl.pathname}</b>}
+                  </Route>
                 </Switch>
               );
             }}
           </Route>
-          <Route path="" options={{ end: false }}>
+          <Route path="" end={false}>
             {() => <div>Not Found</div>}
           </Route>
         </Switch>

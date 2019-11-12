@@ -18,27 +18,7 @@ npm install @blakeembrey/react-route --save
 Use with [React Location](https://github.com/blakeembrey/react-location).
 
 ```js
-import {
-  Match,
-  Route,
-  UseRoute,
-  Switch,
-  usePath
-} from "@blakeembrey/react-route";
-```
-
-### `Match`
-
-Unconditionally renders `children` with the match result of the active URL.
-
-```js
-const App = () => {
-  return (
-    <Match path="/test">
-      {(result, location) => <div>{JSON.stringify(result)}</div>}
-    </Match>
-  );
-}; // `/test` => `<div>{"params":[],"index":0,"value":"/test"}</div>`
+import { Route, Switch, useMatch, usePath } from "@blakeembrey/react-route";
 ```
 
 ### `Route`
@@ -55,23 +35,12 @@ const App = () => {
 }; // `/123` => `<div>["123"]</div>`
 ```
 
-### `UseRoute`
+Supports `path-to-regexp` options as props:
 
-Pre-populated `<Route />` with `end=false` for prefix matching (if you don't define the `path`, it'll match everything). A la Express.js routers.
-
-```js
-const App = () => {
-  return (
-    <UseRoute path="/page">
-      {(_, location) => (
-        <div>
-          {JSON.stringify(location.url)} {JSON.stringify(location.fullUrl)}
-        </div>
-      )}
-    </UseRoute>
-  );
-}; // `/page/test` => `<div>"/test" "/page/test"</div>`
-```
+- **sensitive** When `true`, the regexp will be case sensitive. (default: `false`)
+- **strict** When `true`, optional trailing delimiters will not match. (default: `false`)
+- **end** When `true`, the regexp will match to the end of the string. (default: `true`)
+- **start** When `true`, the regexp will match to the beginning of the string. (default: `true`)
 
 ### `Switch`
 
@@ -83,14 +52,27 @@ const App = () => {
     <Switch>
       <Route path="/me">{() => <span>Blake</span>}</Route>
       <Route path="/:id">{([id]) => <div>{id}</div>}</Route>
+      <Route end={false}>{() => <div>404 Not Found</div>}</Route>
     </Switch>
   );
 }; // `/me` => `<span>Blake</span>`
 ```
 
+### `useMatch`
+
+Returns the match of the currently active URL.
+
+```js
+const App = () => {
+  const match = useMatch("/test");
+
+  return <div>{JSON.stringify(result)}</div>;
+}; // `/test` => `<div>{"params":[],"index":0,"path":"/test"}</div>`
+```
+
 ### `usePath`
 
-Create a path from a `path-to-regexp` path and params.
+Creates a path from a `path-to-regexp` path and params.
 
 ```js
 const App = () => {

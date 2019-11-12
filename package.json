@@ -97,6 +97,6 @@
     "@blakeembrey/react-location": "^1.4.0"
   },
   "dependencies": {
-    "path-to-regexp": "^3.0.0"
+    "path-to-regexp": "^5.0.0"
   }
 }
