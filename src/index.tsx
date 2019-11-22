@@ -50,7 +50,7 @@ export function usePathCompile<P extends object = object>(
  */
 export function usePathMatch<P extends object = object>(
   path: string,
-  options?: pathToRegexp.ParseOptions & pathToRegexp.RegexpToFunctionOptions
+  options?: pathToRegexp.ParseOptions & pathToRegexp.TokensToRegexpOptions
 ) {
   return React.useMemo(
     () =>
