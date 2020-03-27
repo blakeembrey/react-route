@@ -1,12 +1,23 @@
 import * as React from "react";
 import { render } from "react-dom";
+import { act } from "react-dom/test-utils";
 import { Context, SimpleLocation, Link } from "@blakeembrey/react-location";
 import { Route, Switch, usePath, useMatch } from "./index";
 
 describe("react route", () => {
+  let node: HTMLDivElement;
+
+  beforeEach(() => {
+    node = document.createElement("div");
+    document.body.appendChild(node);
+  });
+
+  afterEach(() => {
+    document.body.removeChild(node);
+  });
+
   it("should not match route", () => {
     const location = new SimpleLocation(new URL("http://example.com/test"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -20,7 +31,6 @@ describe("react route", () => {
 
   it("should match route", () => {
     const location = new SimpleLocation(new URL("http://example.com/foo"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -35,7 +45,6 @@ describe("react route", () => {
 
   it("should render with params", () => {
     const location = new SimpleLocation(new URL("http://example.com/blog/123"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -52,7 +61,6 @@ describe("react route", () => {
 
   it("should support optional params", () => {
     const location = new SimpleLocation(new URL("http://example.com/blog"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -69,7 +77,6 @@ describe("react route", () => {
 
   it("should prefix match route", () => {
     const location = new SimpleLocation(new URL("http://example.com/foo/bar"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -86,7 +93,6 @@ describe("react route", () => {
 
   it("should suffix match route", () => {
     const location = new SimpleLocation(new URL("http://example.com/foo/bar"));
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -105,7 +111,6 @@ describe("react route", () => {
     const location = new SimpleLocation(
       new URL("http://example.com/caf%C3%A9/test")
     );
-    const node = document.createElement("div");
 
     render(
       <Context.Provider value={location}>
@@ -122,9 +127,6 @@ describe("react route", () => {
 
   it("should support links", () => {
     const location = new SimpleLocation(new URL("http://example.com/foo"));
-    const node = document.createElement("div");
-
-    document.body.appendChild(node);
 
     render(
       <Context.Provider value={location}>
@@ -139,13 +141,9 @@ describe("react route", () => {
     (node.children[0] as HTMLAnchorElement).click();
 
     expect(node.children.length).toBe(0);
-
-    document.body.removeChild(node);
   });
 
   it("should compile paths", () => {
-    const node = document.createElement("div");
-
     const App = () => {
       const path = usePath<{ id: string }>("/:id", { id: "123" });
 
@@ -159,8 +157,6 @@ describe("react route", () => {
   });
 
   it("should encode path parameters", () => {
-    const node = document.createElement("div");
-
     const App = () => {
       const path = usePath<{ id: string }>("/:id", { id: "café" });
 
@@ -181,8 +177,6 @@ describe("react route", () => {
     };
 
     it("should render matches", () => {
-      const node = document.createElement("div");
-
       render(<App />, node);
 
       expect(node.children.length).toBe(1);
@@ -191,7 +185,6 @@ describe("react route", () => {
 
     it("should render non-matches", () => {
       const location = new SimpleLocation(new URL("http://example.com/page"));
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -210,6 +203,7 @@ describe("react route", () => {
       return (
         <Switch>
           <Route path="/me">{() => <span>Blake</span>}</Route>
+          <Route path="/echo">{(_, { url }) => <span>{url.href}</span>}</Route>
           <Route<{ id: string }> path="/:id">
             {({ id }) => <div>{id}</div>}
           </Route>
@@ -219,7 +213,6 @@ describe("react route", () => {
 
     it("should render match", () => {
       const location = new SimpleLocation(new URL("http://example.com/123"));
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -233,9 +226,41 @@ describe("react route", () => {
       expect(node.children[0].textContent).toEqual("123");
     });
 
-    it("should match first match only", () => {
+    it("should update child routers on change", () => {
+      const location = new SimpleLocation(new URL("http://example.com/echo"));
+
+      render(
+        <Context.Provider value={location}>
+          <App />
+        </Context.Provider>,
+        node
+      );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].nodeName).toEqual("SPAN");
+      expect(node.children[0].textContent).toEqual("http://example.com/");
+
+      act(() => location.push("#test"));
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("http://example.com/#test");
+
+      act(() => location.push("?test=true"));
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual(
+        "http://example.com/?test=true"
+      );
+
+      act(() => location.push("/me"));
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("Blake");
+
+      act(() => location.push("/foobar"));
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("foobar");
+    });
+
+    it("should render first match only", () => {
       const location = new SimpleLocation(new URL("http://example.com/me"));
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -251,7 +276,6 @@ describe("react route", () => {
 
     it("should render nothing when no match", () => {
       const location = new SimpleLocation(new URL("http://example.com/x/y/z"));
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -267,7 +291,6 @@ describe("react route", () => {
       const location = new SimpleLocation(
         new URL("http://example.com/caf%C3%A9")
       );
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -311,7 +334,6 @@ describe("react route", () => {
 
     it("should render page route", () => {
       const location = new SimpleLocation(new URL("http://example.com/page"));
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -329,7 +351,6 @@ describe("react route", () => {
       const location = new SimpleLocation(
         new URL("http://example.com/page/123")
       );
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -347,9 +368,6 @@ describe("react route", () => {
       const location = new SimpleLocation(
         new URL("http://example.com/page/me")
       );
-      const node = document.createElement("div");
-
-      document.body.appendChild(node);
 
       render(
         <Context.Provider value={location}>
@@ -367,15 +385,12 @@ describe("react route", () => {
       expect(node.children.length).toBe(1);
       expect(node.children[0].nodeName).toEqual("DIV");
       expect(node.children[0].textContent).toEqual("Not Found");
-
-      document.body.removeChild(node);
     });
 
     it("should render not found route", () => {
       const location = new SimpleLocation(
         new URL("http://example.com/not/found")
       );
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>
@@ -393,7 +408,6 @@ describe("react route", () => {
       const location = new SimpleLocation(
         new URL("http://example.com/page/not/found")
       );
-      const node = document.createElement("div");
 
       render(
         <Context.Provider value={location}>

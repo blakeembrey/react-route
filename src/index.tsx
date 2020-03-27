@@ -89,6 +89,11 @@ export function useMatch<P extends object = object>(
   return React.useMemo(() => fn(url.pathname), [fn, url.pathname]);
 }
 
+export type RouteChildren<P extends object> = (
+  params: P,
+  location: RouteLocation
+) => React.ReactNode;
+
 /**
  * Route props accept a path, options and a function to render on match.
  */
@@ -98,7 +103,7 @@ export interface RouteProps<P extends object> {
   start?: boolean;
   end?: boolean;
   strict?: boolean;
-  children: (params: P, location: RouteLocation) => React.ReactNode;
+  children: RouteChildren<P>;
 }
 
 /**
@@ -123,24 +128,36 @@ function toMatchOptions(
  * Conditionally renders `children` when the path matches the active URL.
  */
 export function Route<P extends object = object>(props: RouteProps<P>) {
-  const location = React.useContext(Context);
-  const result = useMatch<P>(props.path || "", toMatchOptions(props));
-  return result ? renderRoute(props.children, result, location) : null;
+  const match = useMatch<P>(props.path || "", toMatchOptions(props));
+  return match ? <ShowRoute children={props.children} match={match} /> : null;
 }
 
 /**
  * Render the body of a `<Route />` component.
  */
-function renderRoute<P extends object>(
-  fn: (params: P, location: RouteLocation) => React.ReactNode,
-  match: pathToRegexp.MatchResult<P>,
-  location: SimpleLocation
-) {
-  const { params, index, path } = match;
+function ShowRoute<P extends object>(props: {
+  children: RouteChildren<P>;
+  match: pathToRegexp.MatchResult<P>;
+}) {
+  const location = React.useContext(Context);
+  const { params, index, path } = props.match;
   const url = nestedUrl(location.url, index, path);
   const route = new RouteLocation(url, location);
 
-  return <Context.Provider value={route}>{fn(params, route)}</Context.Provider>;
+  React.useLayoutEffect(
+    () =>
+      location.onChange(() => {
+        // Update nested route when parent changes (e.g. hash or search).
+        route.url = nestedUrl(location.url, index, path);
+      }),
+    [location]
+  );
+
+  return (
+    <Context.Provider value={route}>
+      {props.children(params, route)}
+    </Context.Provider>
+  );
 }
 
 /**
@@ -172,17 +189,21 @@ export function Switch({ children }: SwitchProps) {
     [children]
   );
 
-  return React.useMemo(
+  const [child, match] = React.useMemo<
+    [RouteChildren<any> | null, pathToRegexp.Match]
+  >(
     () => {
       for (const { match, fn } of childRoutes) {
         const result = match(url.pathname);
-        if (result) return renderRoute(fn, result, location);
+        if (result) return [fn, result];
       }
 
-      return null;
+      return [null, false];
     },
     [url.pathname, location, childRoutes]
   );
+
+  return child && match ? <ShowRoute children={child} match={match} /> : null;
 }
 
 /**
@@ -190,8 +211,7 @@ export function Switch({ children }: SwitchProps) {
  */
 function nestedUrl(url: URL, index: number, { length }: string) {
   if (length === 0) return url; // No URL change.
-  const { pathname, search, hash, href } = url;
+  const { pathname, search, hash, origin } = url;
   const newPathname = pathname.slice(0, index) + pathname.slice(index + length);
-  const newPath = `${newPathname || "/"}${search}${hash}`;
-  return new URL(newPath, href);
+  return new URL(`${origin}${newPathname || "/"}${search}${hash}`);
 }
