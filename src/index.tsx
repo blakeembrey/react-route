@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   Context,
   SimpleLocation,
-  useRouter
+  useRouter,
 } from "@blakeembrey/react-location";
 
 /**
@@ -39,7 +39,7 @@ export function usePathCompile<P extends object = object>(
     () =>
       pathToRegexp.compile<P>(path, {
         encode: encodeURIComponent,
-        ...options
+        ...options,
       }),
     [path, options]
   );
@@ -57,7 +57,7 @@ export function usePathMatch<P extends object = object>(
       pathToRegexp.match<P>(path, {
         encode: encodeURI,
         decode: decodeURIComponent,
-        ...options
+        ...options,
       }),
     [path, options]
   );
@@ -120,7 +120,7 @@ function toMatchOptions(
     sensitive,
     strict,
     encode: encodeURI,
-    decode: decodeURIComponent
+    decode: decodeURIComponent,
   };
 }
 
@@ -175,7 +175,7 @@ export function Switch({ children }: SwitchProps) {
 
   const childRoutes = React.useMemo(
     () =>
-      React.Children.map(children, child => {
+      React.Children.map(children, (child) => {
         const { path, children: fn } = child.props;
         const options = toMatchOptions(child.props);
 
@@ -191,17 +191,14 @@ export function Switch({ children }: SwitchProps) {
 
   const [child, match] = React.useMemo<
     [RouteChildren<any> | null, pathToRegexp.Match]
-  >(
-    () => {
-      for (const { match, fn } of childRoutes) {
-        const result = match(url.pathname);
-        if (result) return [fn, result];
-      }
+  >(() => {
+    for (const { match, fn } of childRoutes) {
+      const result = match(url.pathname);
+      if (result) return [fn, result];
+    }
 
-      return [null, false];
-    },
-    [url.pathname, location, childRoutes]
-  );
+    return [null, false];
+  }, [url.pathname, location, childRoutes]);
 
   return child && match ? <ShowRoute children={child} match={match} /> : null;
 }

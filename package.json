@@ -13,7 +13,7 @@
   "scripts": {
     "prettier": "prettier --write",
     "lint": "tslint \"src/**/*\" --project tsconfig.json",
-    "format": "npm run prettier -- \"{.,src/**}/*.{js,jsx,ts,tsx,json,md,yml,yaml}\"",
+    "format": "npm run prettier -- \"{*,src/**/*}.{js,jsx,ts,tsx,json,md,yml,yaml}\"",
     "build": "rimraf dist/ dist.es2015/ && tsc && tsc -P tsconfig.es2015.json",
     "specs": "jest --coverage",
     "test": "npm run -s lint && npm run -s build && npm run -s specs && npm run -s size",
@@ -74,31 +74,29 @@
     }
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,md,yml,yaml}": [
-      "npm run prettier",
-      "git add"
-    ]
+    "*.{js,jsx,ts,tsx,json,md,yml,yaml}": "npm run prettier"
   },
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
     "@blakeembrey/react-location": "^1.4.0",
-    "@size-limit/preset-small-lib": "^2.2.0",
-    "@types/jest": "^24.0.0",
-    "@types/node": "^12.6.8",
+    "@size-limit/preset-small-lib": "^4.4.2",
+    "@types/jest": "^25.1.4",
+    "@types/node": "^13.9.5",
     "@types/react": "^16.8.2",
     "@types/react-dom": "^16.8.0",
-    "husky": "^3.0.2",
-    "jest": "^24.1.0",
-    "lint-staged": "^9.2.1",
-    "prettier": "^1.14.2",
+    "husky": "^4.2.3",
+    "jest": "^25.2.3",
+    "lint-staged": "^10.0.9",
+    "prettier": "^2.0.2",
     "react": "^16.8.6",
     "react-dom": "^16.8.1",
     "react-location": "^2.0.5",
     "rimraf": "^3.0.0",
-    "ts-jest": "^24.0.2",
-    "tslint": "^5.0.0",
+    "size-limit": "^4.4.2",
+    "ts-jest": "^25.2.1",
+    "tslint": "^6.1.0",
     "tslint-config-prettier": "^1.15.0",
     "tslint-config-standard": "^9.0.0",
     "typescript": "^3.8.3"
