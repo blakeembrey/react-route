@@ -3,17 +3,14 @@ import * as React from "react";
 import { Context } from "@blakeembrey/react-location";
 
 /**
- * Use context to communicate the route params.
- */
-export interface Route<P extends object = object> {
-  params: P;
-  pathname: string;
-}
-
-/**
  * Internal context for nested route matching.
  */
-export const RouteContext = React.createContext<Route | undefined>(undefined);
+const RouteContext = React.createContext<
+  | {
+      pathname: string;
+    }
+  | undefined
+>(undefined);
 
 /**
  * Use pathname from context (or fallback on global URL).
@@ -21,9 +18,9 @@ export const RouteContext = React.createContext<Route | undefined>(undefined);
 export const usePathname = () => {
   const location = React.useContext(Context);
   const [pathname, setPathname] = React.useState(location.url.pathname);
-  React.useLayoutEffect(() =>
-    location.onChange(() => setPathname(location.url.pathname))
-  );
+  React.useLayoutEffect(() => {
+    return location.onChange(() => setPathname(location.url.pathname));
+  });
   const route = React.useContext(RouteContext);
   return route ? route.pathname : pathname;
 };
@@ -52,6 +49,16 @@ export function useCompile<P extends object = object>(
       }),
     [path, sensitive]
   );
+}
+
+/**
+ * Standard options for `pathToRegexp.match`.
+ */
+export interface MatchOptions {
+  sensitive?: boolean;
+  start?: boolean;
+  end?: boolean;
+  strict?: boolean;
 }
 
 /**
@@ -87,16 +94,6 @@ export type RouteComponent<P extends object> = React.ComponentType<{
 }>;
 
 /**
- * Standard options for `pathToRegexp.match`.
- */
-export interface MatchOptions {
-  sensitive?: boolean;
-  start?: boolean;
-  end?: boolean;
-  strict?: boolean;
-}
-
-/**
  * Route props accept a path, options and a function to render on match.
  */
 export interface RouteProps<P extends object> extends MatchOptions {
@@ -125,30 +122,25 @@ function toMatchOptions(
 /**
  * Conditionally renders `children` when the path matches the active URL.
  */
-export function Route<P extends object = object>({
-  path = "",
-  start,
-  end,
-  sensitive,
-  strict,
-  component,
-}: RouteProps<P>) {
+export function Route<P extends object = object>(props: RouteProps<P>) {
   const pathname = usePathname();
-  const match = useMatch<P>(path, { start, end, sensitive, strict });
+  const match = useMatch<P>(props.path || "", props);
   const result = React.useMemo(() => match(pathname), [match, pathname]);
-  return result ? <ShowRoute component={component} result={result} /> : null;
+  return result ? <Output component={props.component} result={result} /> : null;
 }
 
 /**
  * Render the body of a `<Route />` component.
  */
-function ShowRoute<P extends object>(props: {
+function Output<P extends object>(props: {
   component: RouteComponent<P>;
   result: pathToRegexp.MatchResult<P>;
 }) {
-  const { component: Component, result: match } = props;
+  const {
+    component: Component,
+    result: { params, index, path },
+  } = props;
   const pathname = usePathname();
-  const { params, index, path } = match;
   const route = React.useMemo(
     () => ({
       pathname: nestedPathname(pathname, index, path),
@@ -173,17 +165,9 @@ export interface SwitchProps {
 }
 
 /**
- * Renders `null` as the default fallback when `<Switch />` does not match.
- */
-export const FallbackComponent = () => null;
-
-/**
  * Component for matching and rendering the first `<Route />` of children.
  */
-export function Switch({
-  children,
-  fallback: Fallback = FallbackComponent,
-}: SwitchProps) {
+export function Switch({ children, fallback: Fallback }: SwitchProps) {
   const pathname = usePathname();
 
   const childRoutes = React.useMemo(
@@ -205,10 +189,10 @@ export function Switch({
   return React.useMemo(() => {
     for (const { match, component } of childRoutes) {
       const result = match(pathname);
-      if (result) return <ShowRoute component={component} result={result} />;
+      if (result) return <Output component={component} result={result} />;
     }
 
-    return <Fallback />;
+    return Fallback ? <Fallback /> : null;
   }, [pathname, childRoutes]);
 }
 
