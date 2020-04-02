@@ -1,8 +1,13 @@
 import * as React from "react";
 import { render } from "react-dom";
 import { act } from "react-dom/test-utils";
-import { Context, SimpleLocation, Link } from "@blakeembrey/react-location";
-import { Route, Switch, usePath, useMatch } from "./index";
+import {
+  Context,
+  SimpleLocation,
+  Link,
+  useRouter,
+} from "@blakeembrey/react-location";
+import { Route, Switch, useCompile, useMatch, usePathname } from "./index";
 
 describe("react route", () => {
   let node: HTMLDivElement;
@@ -21,7 +26,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo">{() => <div>Hello world!</div>}</Route>
+        <Route path="/foo" component={() => <div>Hello world!</div>} />
       </Context.Provider>,
       node
     );
@@ -34,7 +39,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo">{(_, { url }) => <div>{url.pathname}</div>}</Route>
+        <Route path="/foo" component={() => <div>{usePathname()}</div>} />
       </Context.Provider>,
       node
     );
@@ -48,9 +53,10 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route<{ id: string }> path="/blog/:id">
-          {({ id }) => <div>{id}</div>}
-        </Route>
+        <Route<{ id: string }>
+          path="/blog/:id"
+          component={({ params: { id } }) => <div>{id}</div>}
+        />
       </Context.Provider>,
       node
     );
@@ -64,9 +70,10 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route<{ id?: string }> path="/blog/:id?">
-          {({ id }) => <div>{typeof id}</div>}
-        </Route>
+        <Route<{ id?: string }>
+          path="/blog/:id?"
+          component={({ params: { id } }) => <div>{typeof id}</div>}
+        />
       </Context.Provider>,
       node
     );
@@ -80,9 +87,11 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo" end={false}>
-          {(_, { url }) => <div>{url.pathname}</div>}
-        </Route>
+        <Route
+          path="/foo"
+          end={false}
+          component={() => <div>{usePathname()}</div>}
+        />
       </Context.Provider>,
       node
     );
@@ -96,9 +105,11 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/bar" start={false}>
-          {(_, { url }) => <div>{url.pathname}</div>}
-        </Route>
+        <Route
+          path="/bar"
+          start={false}
+          component={() => <div>{usePathname()}</div>}
+        />
       </Context.Provider>,
       node
     );
@@ -114,9 +125,11 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/café" end={false}>
-          {(_, { url }) => <div>{url.pathname}</div>}
-        </Route>
+        <Route
+          path="/café"
+          end={false}
+          component={() => <div>{usePathname()}</div>}
+        />
       </Context.Provider>,
       node
     );
@@ -130,7 +143,10 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo">{() => <Link to="/test">Click here</Link>}</Route>
+        <Route
+          path="/foo"
+          component={() => <Link to="/test">Click here</Link>}
+        />
       </Context.Provider>,
       node
     );
@@ -143,9 +159,66 @@ describe("react route", () => {
     expect(node.children.length).toBe(0);
   });
 
+  it("should render route on change", () => {
+    const location = new SimpleLocation(new URL("http://example.com/foo"));
+    let renderCount = 0;
+
+    render(
+      <Context.Provider value={location}>
+        <Route
+          path="/foo"
+          component={() => {
+            renderCount++;
+
+            return <div />;
+          }}
+        />
+      </Context.Provider>,
+      node
+    );
+
+    expect(node.children.length).toBe(1);
+    expect(renderCount).toBe(1);
+
+    act(() => location.push("/foo?x=y"));
+
+    expect(node.children.length).toBe(1);
+    expect(renderCount).toBe(1);
+  });
+
+  it("should render switch route on change", () => {
+    const location = new SimpleLocation(new URL("http://example.com/foo"));
+    let renderCount = 0;
+
+    render(
+      <Context.Provider value={location}>
+        <Switch>
+          <Route
+            path="/foo"
+            component={() => {
+              renderCount++;
+
+              return <div />;
+            }}
+          />
+          <Route end={false} component={() => <div />} />
+        </Switch>
+      </Context.Provider>,
+      node
+    );
+
+    expect(node.children.length).toBe(1);
+    expect(renderCount).toBe(1);
+
+    act(() => location.push("/foo?x=y"));
+
+    expect(node.children.length).toBe(1);
+    expect(renderCount).toBe(1);
+  });
+
   it("should compile paths", () => {
     const App = () => {
-      const path = usePath<{ id: string }>("/:id", { id: "123" });
+      const path = useCompile<{ id: string }>("/:id")({ id: "123" });
 
       return <div>{path}</div>;
     };
@@ -158,7 +231,7 @@ describe("react route", () => {
 
   it("should encode path parameters", () => {
     const App = () => {
-      const path = usePath<{ id: string }>("/:id", { id: "café" });
+      const path = useCompile<{ id: string }>("/:id")({ id: "café" });
 
       return <div>{path}</div>;
     };
@@ -172,19 +245,13 @@ describe("react route", () => {
   describe("match", () => {
     const App = () => {
       const match = useMatch("/");
+      const pathname = usePathname();
 
-      return <div>{match ? "true" : "false"}</div>;
+      return <div>{match(pathname) ? "true" : "false"}</div>;
     };
 
     it("should render matches", () => {
-      render(<App />, node);
-
-      expect(node.children.length).toBe(1);
-      expect(node.children[0].textContent).toEqual("true");
-    });
-
-    it("should render non-matches", () => {
-      const location = new SimpleLocation(new URL("http://example.com/page"));
+      const location = new SimpleLocation(new URL("http://example.com"));
 
       render(
         <Context.Provider value={location}>
@@ -192,6 +259,11 @@ describe("react route", () => {
         </Context.Provider>,
         node
       );
+
+      expect(node.children.length).toBe(1);
+      expect(node.children[0].textContent).toEqual("true");
+
+      act(() => location.push("/foo"));
 
       expect(node.children.length).toBe(1);
       expect(node.children[0].textContent).toEqual("false");
@@ -202,11 +274,18 @@ describe("react route", () => {
     const App = () => {
       return (
         <Switch>
-          <Route path="/me">{() => <span>Blake</span>}</Route>
-          <Route path="/echo">{(_, { url }) => <span>{url.href}</span>}</Route>
-          <Route<{ id: string }> path="/:id">
-            {({ id }) => <div>{id}</div>}
-          </Route>
+          <Route path="/me" component={() => <span>Blake</span>} />
+          <Route
+            path="/echo"
+            component={() => {
+              const [url] = useRouter();
+              return <span>{url.href}</span>;
+            }}
+          />
+          <Route<{ id: string }>
+            path="/:id"
+            component={({ params: { id } }) => <div>{id}</div>}
+          />
         </Switch>
       );
     };
@@ -238,16 +317,18 @@ describe("react route", () => {
 
       expect(node.children.length).toBe(1);
       expect(node.children[0].nodeName).toEqual("SPAN");
-      expect(node.children[0].textContent).toEqual("http://example.com/");
+      expect(node.children[0].textContent).toEqual("http://example.com/echo");
 
       act(() => location.push("#test"));
       expect(node.children.length).toBe(1);
-      expect(node.children[0].textContent).toEqual("http://example.com/#test");
+      expect(node.children[0].textContent).toEqual(
+        "http://example.com/echo#test"
+      );
 
       act(() => location.push("?test=true"));
       expect(node.children.length).toBe(1);
       expect(node.children[0].textContent).toEqual(
-        "http://example.com/?test=true"
+        "http://example.com/echo?test=true"
       );
 
       act(() => location.push("/me"));
@@ -309,25 +390,32 @@ describe("react route", () => {
     const App = () => {
       return (
         <Switch>
-          <Route path="/page" end={false}>
-            {() => {
+          <Route
+            path="/page"
+            end={false}
+            component={() => {
               return (
                 <Switch>
-                  <Route path="/">{() => <ul />}</Route>
-                  <Route path="/me">{() => <Link to="/foo">Blake</Link>}</Route>
-                  <Route<{ id: string }> path="/:id">
-                    {({ id }) => <div>{id}</div>}
-                  </Route>
-                  <Route end={false}>
-                    {(_, { fullUrl }) => <b>{fullUrl.pathname}</b>}
-                  </Route>
+                  <Route path="/" component={() => <ul />} />
+                  <Route
+                    path="/me"
+                    component={() => <Link to="/foo">Blake</Link>}
+                  />
+                  <Route<{ id: string }>
+                    path="/:id"
+                    component={({ params: { id } }) => <div>{id}</div>}
+                  />
+                  <Route
+                    end={false}
+                    component={() => (
+                      <b>{React.useContext(Context).url.pathname}</b>
+                    )}
+                  />
                 </Switch>
               );
             }}
-          </Route>
-          <Route path="" end={false}>
-            {() => <div>Not Found</div>}
-          </Route>
+          />
+          <Route path="" end={false} component={() => <div>Not Found</div>} />
         </Switch>
       );
     };

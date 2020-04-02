@@ -1,118 +1,116 @@
 import * as pathToRegexp from "path-to-regexp";
 import * as React from "react";
-import {
-  Context,
-  SimpleLocation,
-  useRouter,
-} from "@blakeembrey/react-location";
+import { Context } from "@blakeembrey/react-location";
 
 /**
- * Simple nested router support.
+ * Use context to communicate the route params.
  */
-export class RouteLocation extends SimpleLocation {
-  constructor(url: URL, public parent: SimpleLocation) {
-    super(url);
-  }
+export interface Route<P extends object = object> {
+  params: P;
+  pathname: string;
+}
 
-  get fullUrl(): URL {
-    if (this.parent instanceof RouteLocation) return this.parent.fullUrl;
-    return this.parent.url;
-  }
+/**
+ * Internal context for nested route matching.
+ */
+export const RouteContext = React.createContext<Route | undefined>(undefined);
 
-  push(location: string) {
-    return this.parent.push(location);
-  }
+/**
+ * Use pathname from context (or fallback on global URL).
+ */
+export const usePathname = () => {
+  const location = React.useContext(Context);
+  const [pathname, setPathname] = React.useState(location.url.pathname);
+  React.useLayoutEffect(() =>
+    location.onChange(() => setPathname(location.url.pathname))
+  );
+  const route = React.useContext(RouteContext);
+  return route ? route.pathname : pathname;
+};
 
-  format(location: string) {
-    return this.parent.format(location);
-  }
+/**
+ * Options for `pathToRegexp.compile`.
+ */
+export interface CompileOptions {
+  sensitive?: boolean;
 }
 
 /**
  * Create a compiled path function.
  */
-export function usePathCompile<P extends object = object>(
+export function useCompile<P extends object = object>(
   path: string,
-  options?: pathToRegexp.ParseOptions & pathToRegexp.TokensToFunctionOptions
+  options: CompileOptions = {}
 ) {
+  const { sensitive } = options;
+
   return React.useMemo(
     () =>
       pathToRegexp.compile<P>(path, {
         encode: encodeURIComponent,
-        ...options,
+        sensitive,
       }),
-    [path, options]
+    [path, sensitive]
   );
 }
 
 /**
  * React hook for matching URLs.
  */
-export function usePathMatch<P extends object = object>(
+export function useMatch<P extends object = object>(
   path: string,
-  options?: pathToRegexp.ParseOptions & pathToRegexp.TokensToRegexpOptions
+  options?: MatchOptions
 ) {
+  const { sensitive, start, end, strict, encode, decode } = toMatchOptions(
+    options
+  );
+
   return React.useMemo(
     () =>
       pathToRegexp.match<P>(path, {
-        encode: encodeURI,
-        decode: decodeURIComponent,
-        ...options,
+        sensitive,
+        start,
+        end,
+        strict,
+        encode,
+        decode,
       }),
-    [path, options]
+    [path, encode, decode, sensitive, start, end, strict]
   );
 }
 
 /**
- * Create a path from a `path-to-regexp` path and params.
+ * Render a route.
  */
-export function usePath<P extends object = object>(
-  path: string,
-  params?: P,
-  options?: pathToRegexp.ParseOptions & pathToRegexp.TokensToRegexpOptions
-) {
-  const fn = usePathCompile<P>(path, options);
-  return React.useMemo(() => fn(params), [fn, params]);
-}
+export type RouteComponent<P extends object> = React.ComponentType<{
+  params: P;
+}>;
 
 /**
- * Get match from the current URL.
+ * Standard options for `pathToRegexp.match`.
  */
-export function useMatch<P extends object = object>(
-  path: string,
-  options?: pathToRegexp.ParseOptions &
-    pathToRegexp.TokensToRegexpOptions &
-    pathToRegexp.RegexpToFunctionOptions
-) {
-  const [url] = useRouter();
-  const fn = usePathMatch<P>(path, options);
-  return React.useMemo(() => fn(url.pathname), [fn, url.pathname]);
-}
-
-export type RouteChildren<P extends object> = (
-  params: P,
-  location: RouteLocation
-) => React.ReactNode;
-
-/**
- * Route props accept a path, options and a function to render on match.
- */
-export interface RouteProps<P extends object> {
-  path?: string;
+export interface MatchOptions {
   sensitive?: boolean;
   start?: boolean;
   end?: boolean;
   strict?: boolean;
-  children: RouteChildren<P>;
+}
+
+/**
+ * Route props accept a path, options and a function to render on match.
+ */
+export interface RouteProps<P extends object> extends MatchOptions {
+  path?: string;
+  component: RouteComponent<P>;
 }
 
 /**
  * Extract `match` options from component props.
  */
 function toMatchOptions(
-  props: RouteProps<any>
+  options: MatchOptions = {}
 ): pathToRegexp.TokensToRegexpOptions & pathToRegexp.RegexpToFunctionOptions {
-  const { start, end, sensitive, strict } = props;
+  const { start, end, sensitive, strict } = options;
 
   return {
     start,
@@ -127,36 +125,42 @@ function toMatchOptions(
 /**
  * Conditionally renders `children` when the path matches the active URL.
  */
-export function Route<P extends object = object>(props: RouteProps<P>) {
-  const match = useMatch<P>(props.path || "", toMatchOptions(props));
-  return match ? <ShowRoute children={props.children} match={match} /> : null;
+export function Route<P extends object = object>({
+  path = "",
+  start,
+  end,
+  sensitive,
+  strict,
+  component,
+}: RouteProps<P>) {
+  const pathname = usePathname();
+  const match = useMatch<P>(path, { start, end, sensitive, strict });
+  const result = React.useMemo(() => match(pathname), [match, pathname]);
+  return result ? <ShowRoute component={component} result={result} /> : null;
 }
 
 /**
  * Render the body of a `<Route />` component.
  */
 function ShowRoute<P extends object>(props: {
-  children: RouteChildren<P>;
-  match: pathToRegexp.MatchResult<P>;
+  component: RouteComponent<P>;
+  result: pathToRegexp.MatchResult<P>;
 }) {
-  const location = React.useContext(Context);
-  const { params, index, path } = props.match;
-  const url = nestedUrl(location.url, index, path);
-  const route = new RouteLocation(url, location);
-
-  React.useLayoutEffect(
-    () =>
-      location.onChange(() => {
-        // Update nested route when parent changes (e.g. hash or search).
-        route.url = nestedUrl(location.url, index, path);
-      }),
-    [location]
+  const { component: Component, result: match } = props;
+  const pathname = usePathname();
+  const { params, index, path } = match;
+  const route = React.useMemo(
+    () => ({
+      pathname: nestedPathname(pathname, index, path),
+      params,
+    }),
+    [pathname, index, path]
   );
 
   return (
-    <Context.Provider value={route}>
-      {props.children(params, route)}
-    </Context.Provider>
+    <RouteContext.Provider value={route}>
+      <Component params={params} />
+    </RouteContext.Provider>
   );
 }
 
@@ -164,24 +168,33 @@ function ShowRoute<P extends object>(props: {
  * Switch is a wrapper component for a list of `<Route />`.
  */
 export interface SwitchProps {
+  fallback?: React.ComponentType<{}>;
   children: Array<React.ReactElement<RouteProps<object>, typeof Route>>;
 }
 
 /**
+ * Renders `null` as the default fallback when `<Switch />` does not match.
+ */
+export const FallbackComponent = () => null;
+
+/**
  * Component for matching and rendering the first `<Route />` of children.
  */
-export function Switch({ children }: SwitchProps) {
-  const [url, location] = useRouter();
+export function Switch({
+  children,
+  fallback: Fallback = FallbackComponent,
+}: SwitchProps) {
+  const pathname = usePathname();
 
   const childRoutes = React.useMemo(
     () =>
       React.Children.map(children, (child) => {
-        const { path, children: fn } = child.props;
+        const { path, component } = child.props;
         const options = toMatchOptions(child.props);
 
         if (child.type === Route) {
           const match = pathToRegexp.match(path || "", options);
-          return { fn, match };
+          return { component, match };
         }
 
         throw new TypeError("Expected `<Switch />` children to be `<Route />`");
@@ -189,26 +202,20 @@ export function Switch({ children }: SwitchProps) {
     [children]
   );
 
-  const [child, match] = React.useMemo<
-    [RouteChildren<any> | null, pathToRegexp.Match]
-  >(() => {
-    for (const { match, fn } of childRoutes) {
-      const result = match(url.pathname);
-      if (result) return [fn, result];
+  return React.useMemo(() => {
+    for (const { match, component } of childRoutes) {
+      const result = match(pathname);
+      if (result) return <ShowRoute component={component} result={result} />;
     }
 
-    return [null, false];
-  }, [url.pathname, location, childRoutes]);
-
-  return child && match ? <ShowRoute children={child} match={match} /> : null;
+    return <Fallback />;
+  }, [pathname, childRoutes]);
 }
 
 /**
  * Compute nested URL for route.
  */
-function nestedUrl(url: URL, index: number, { length }: string) {
-  if (length === 0) return url; // No URL change.
-  const { pathname, search, hash, origin } = url;
-  const newPathname = pathname.slice(0, index) + pathname.slice(index + length);
-  return new URL(`${origin}${newPathname || "/"}${search}${hash}`);
+function nestedPathname(pathname: string, index: number, { length }: string) {
+  if (length === 0) return pathname; // No URL change.
+  return pathname.slice(0, index) + pathname.slice(index + length) || "/";
 }
