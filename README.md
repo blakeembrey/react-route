@@ -4,6 +4,7 @@
 [![NPM downloads][downloads-image]][downloads-url]
 [![Build status][travis-image]][travis-url]
 [![Test coverage][coveralls-image]][coveralls-url]
+[![Bundle size][bundlephobia-image]][bundlephobia-url]
 
 > [Path-to-RegExp](https://github.com/pillarjs/path-to-regexp) with [React Location](https://github.com/blakeembrey/react-location).
 
@@ -126,3 +127,5 @@ Apache 2.0
 [travis-url]: https://travis-ci.org/blakeembrey/react-route
 [coveralls-image]: https://img.shields.io/coveralls/blakeembrey/react-route.svg?style=flat
 [coveralls-url]: https://coveralls.io/r/blakeembrey/react-route?branch=master
+[bundlephobia-image]: https://img.shields.io/bundlephobia/minzip/@blakeembrey/react-route.svg
+[bundlephobia-url]: https://bundlephobia.com/result?p=@blakeembrey/react-route
