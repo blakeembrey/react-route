@@ -18,7 +18,14 @@ npm install @blakeembrey/react-route --save
 Use with [React Location](https://github.com/blakeembrey/react-location).
 
 ```js
-import { Route, Switch, useMatch, useCompile } from "@blakeembrey/react-route";
+import {
+  Route,
+  Switch,
+  useRoutePath,
+  useMatch,
+  usePathMatch,
+  usePathCompile,
+} from "@blakeembrey/react-route";
 ```
 
 ### `Route`
@@ -30,7 +37,7 @@ const App = () => {
   return (
     <Route
       path="/page/:id"
-      component={({ params }) => <div>{JSON.stringify(params)}</div>}
+      component={(params) => <div>{JSON.stringify(params)}</div>}
     />
   );
 }; // `/123` => `<div>["123"]</div>`
@@ -50,42 +57,54 @@ Component for matching and rendering the first `<Route />` of children.
 ```js
 const App = () => {
   return (
-    <Switch>
+    <Switch fallback={...}>
       <Route path="/me" component={() => <span>Blake</span>} />
-      <Route path="/:id" component={([id]) => <div>{id}</div>} />
+      <Route path="/:id" component={({ id }) => <div>{id}</div>} />
       <Route end={false} component={() => <div>404 Not Found</div>} />
     </Switch>
   );
 }; // `/me` => `<span>Blake</span>`
 ```
 
-### `usePathname`
+### `useRoutePath`
 
-Returns the current pathname based on nested routing (e.g. `Route > Route > Route` works automatically).
+Returns the current pathname based on the router (e.g. route prefixes are removed).
 
 ```js
-usePathname(); //=> "/foo"
+useRoutePath(); //=> "/foo"
 ```
 
 ### `useMatch`
+
+Create a `path-to-regexp` match function and run it on the current path.
+
+```js
+const App = () => {
+  const result = useMatch("/test");
+
+  return <div>{JSON.stringify(result)}</div>;
+}; //=> `<div>{"params":[],"index":0,"path":"/test"}</div>`
+```
+
+### `usePathMatch`
 
 Create a `path-to-regexp` match function.
 
 ```js
 const App = () => {
-  const match = useMatch("/test");
+  const match = usePathMatch("/test");
 
-  return <div>{JSON.stringify(match(""))}</div>;
-}; // `/test` => `<div>{"params":[],"index":0,"path":"/test"}</div>`
+  return <div>{JSON.stringify(match("/"))}</div>;
+}; //=> `<div>false</div>`
 ```
 
-### `useCompile`
+### `usePathCompile`
 
 Creates a `path-to-regexp` path function.
 
 ```js
 const App = () => {
-  const path = useCompile("/:id")({ id: 123 });
+  const path = usePathCompile("/:id")({ id: 123 });
 
   return <Link to={path}>User {id}</Link>;
 };

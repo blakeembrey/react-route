@@ -7,7 +7,13 @@ import {
   Link,
   useRouter,
 } from "@blakeembrey/react-location";
-import { Route, Switch, useCompile, useMatch, usePathname } from "./index";
+import {
+  Route,
+  Switch,
+  usePathCompile,
+  usePathMatch,
+  useRoutePath,
+} from "./index";
 
 describe("react route", () => {
   let node: HTMLDivElement;
@@ -39,7 +45,7 @@ describe("react route", () => {
 
     render(
       <Context.Provider value={location}>
-        <Route path="/foo" component={() => <div>{usePathname()}</div>} />
+        <Route path="/foo" component={() => <div>{useRoutePath()}</div>} />
       </Context.Provider>,
       node
     );
@@ -55,7 +61,7 @@ describe("react route", () => {
       <Context.Provider value={location}>
         <Route<{ id: string }>
           path="/blog/:id"
-          component={({ params: { id } }) => <div>{id}</div>}
+          component={({ id }) => <div>{id}</div>}
         />
       </Context.Provider>,
       node
@@ -72,7 +78,7 @@ describe("react route", () => {
       <Context.Provider value={location}>
         <Route<{ id?: string }>
           path="/blog/:id?"
-          component={({ params: { id } }) => <div>{typeof id}</div>}
+          component={({ id }) => <div>{typeof id}</div>}
         />
       </Context.Provider>,
       node
@@ -90,7 +96,7 @@ describe("react route", () => {
         <Route
           path="/foo"
           end={false}
-          component={() => <div>{usePathname()}</div>}
+          component={() => <div>{useRoutePath()}</div>}
         />
       </Context.Provider>,
       node
@@ -108,7 +114,7 @@ describe("react route", () => {
         <Route
           path="/bar"
           start={false}
-          component={() => <div>{usePathname()}</div>}
+          component={() => <div>{useRoutePath()}</div>}
         />
       </Context.Provider>,
       node
@@ -128,7 +134,7 @@ describe("react route", () => {
         <Route
           path="/café"
           end={false}
-          component={() => <div>{usePathname()}</div>}
+          component={() => <div>{useRoutePath()}</div>}
         />
       </Context.Provider>,
       node
@@ -218,7 +224,7 @@ describe("react route", () => {
 
   it("should compile paths", () => {
     const App = () => {
-      const path = useCompile<{ id: string }>("/:id")({ id: "123" });
+      const path = usePathCompile<{ id: string }>("/:id")({ id: "123" });
 
       return <div>{path}</div>;
     };
@@ -231,7 +237,7 @@ describe("react route", () => {
 
   it("should encode path parameters", () => {
     const App = () => {
-      const path = useCompile<{ id: string }>("/:id")({ id: "café" });
+      const path = usePathCompile<{ id: string }>("/:id")({ id: "café" });
 
       return <div>{path}</div>;
     };
@@ -244,8 +250,8 @@ describe("react route", () => {
 
   describe("match", () => {
     const App = () => {
-      const match = useMatch("/");
-      const pathname = usePathname();
+      const match = usePathMatch("/");
+      const pathname = useRoutePath();
 
       return <div>{match(pathname) ? "true" : "false"}</div>;
     };
@@ -284,7 +290,7 @@ describe("react route", () => {
           />
           <Route<{ id: string }>
             path="/:id"
-            component={({ params: { id } }) => <div>{id}</div>}
+            component={({ id }) => <div>{id}</div>}
           />
         </Switch>
       );
@@ -403,7 +409,7 @@ describe("react route", () => {
                   />
                   <Route<{ id: string }>
                     path="/:id"
-                    component={({ params: { id } }) => <div>{id}</div>}
+                    component={({ id }) => <div>{id}</div>}
                   />
                   <Route
                     end={false}

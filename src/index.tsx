@@ -15,7 +15,7 @@ const RouteContext = React.createContext<
 /**
  * Use pathname from context (or fallback on global URL).
  */
-export const usePathname = () => {
+export const useRoutePath = () => {
   const location = React.useContext(Context);
   const [pathname, setPathname] = React.useState(location.url.pathname);
   React.useLayoutEffect(() => {
@@ -35,7 +35,7 @@ export interface CompileOptions {
 /**
  * Create a compiled path function.
  */
-export function useCompile<P extends object = object>(
+export function usePathCompile<P extends object = object>(
   path: string,
   options: CompileOptions = {}
 ) {
@@ -64,7 +64,7 @@ export interface MatchOptions {
 /**
  * React hook for matching URLs.
  */
-export function useMatch<P extends object = object>(
+export function usePathMatch<P extends object = object>(
   path: string,
   options?: MatchOptions
 ) {
@@ -87,18 +87,11 @@ export function useMatch<P extends object = object>(
 }
 
 /**
- * Render a route.
- */
-export type RouteComponent<P extends object> = React.ComponentType<{
-  params: P;
-}>;
-
-/**
  * Route props accept a path, options and a function to render on match.
  */
 export interface RouteProps<P extends object> extends MatchOptions {
   path?: string;
-  component: RouteComponent<P>;
+  component: React.ComponentType<P>;
 }
 
 /**
@@ -120,12 +113,22 @@ function toMatchOptions(
 }
 
 /**
+ * Get the match result of the current path.
+ */
+export function useMatch<P extends object = object>(
+  path?: string,
+  options?: MatchOptions
+) {
+  const pathname = useRoutePath();
+  const match = usePathMatch<P>(path || "", options);
+  return React.useMemo(() => match(pathname), [match, pathname]);
+}
+
+/**
  * Conditionally renders `children` when the path matches the active URL.
  */
 export function Route<P extends object = object>(props: RouteProps<P>) {
-  const pathname = usePathname();
-  const match = useMatch<P>(props.path || "", props);
-  const result = React.useMemo(() => match(pathname), [match, pathname]);
+  const result = useMatch<P>(props.path, props);
   return result ? <Output component={props.component} result={result} /> : null;
 }
 
@@ -133,25 +136,22 @@ export function Route<P extends object = object>(props: RouteProps<P>) {
  * Render the body of a `<Route />` component.
  */
 function Output<P extends object>(props: {
-  component: RouteComponent<P>;
+  component: React.ComponentType<P>;
   result: pathToRegexp.MatchResult<P>;
 }) {
   const {
     component: Component,
     result: { params, index, path },
   } = props;
-  const pathname = usePathname();
-  const route = React.useMemo(
-    () => ({
-      pathname: nestedPathname(pathname, index, path),
-      params,
-    }),
-    [pathname, index, path]
-  );
+  const pathname = useRoutePath();
 
   return (
-    <RouteContext.Provider value={route}>
-      <Component params={params} />
+    <RouteContext.Provider
+      value={{
+        pathname: nestedPathname(pathname, index, path),
+      }}
+    >
+      <Component {...params} />
     </RouteContext.Provider>
   );
 }
@@ -160,15 +160,15 @@ function Output<P extends object>(props: {
  * Switch is a wrapper component for a list of `<Route />`.
  */
 export interface SwitchProps {
-  fallback?: React.ComponentType<{}>;
+  fallback?: JSX.Element | null;
   children: Array<React.ReactElement<RouteProps<object>, typeof Route>>;
 }
 
 /**
  * Component for matching and rendering the first `<Route />` of children.
  */
-export function Switch({ children, fallback: Fallback }: SwitchProps) {
-  const pathname = usePathname();
+export function Switch({ children, fallback = null }: SwitchProps) {
+  const pathname = useRoutePath();
 
   const childRoutes = React.useMemo(
     () =>
@@ -192,7 +192,7 @@ export function Switch({ children, fallback: Fallback }: SwitchProps) {
       if (result) return <Output component={component} result={result} />;
     }
 
-    return Fallback ? <Fallback /> : null;
+    return fallback;
   }, [pathname, childRoutes]);
 }
 
